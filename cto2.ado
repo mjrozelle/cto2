@@ -834,9 +834,17 @@ drop `s(varlist)' name num_vars  label_command format_command ///
 	values_command notes_command command var_stub shapelist_lag vlist ///
 	calculation order note
 	
-frlink m:1 lowest_level, frame(`repeat_group_long')
-frget repeat_group_name repeat_group_label, from(`repeat_group_long')
-drop `repeat_group_long'
+if `repeat_groups' > 0 {
+	
+	frlink m:1 lowest_level, frame(`repeat_group_long')
+	frget repeat_group_name repeat_group_label, from(`repeat_group_long')
+	drop `repeat_group_long'
+	label variable repeat_group_name "name of repeat group this question belongs to"
+	label variable repeat_group_label "label of repeat group this question belongs to"
+	
+	local rp_vars repeat_group_name repeat_group_label
+	
+}
 	
 rename desired_varname name
 rename labelStata varlabel
@@ -856,13 +864,11 @@ label variable vallabel "value label"
 label variable full_question "full question text in instrument"
 label variable repeat_group "lowest-level repeat group to which question belongs"
 label variable conditions "full set of relevancy conditions for this question"
-label variable repeat_group_name "name of repeat group this question belongs to"
-label variable repeat_group_label "label of repeat group this question belongs to"
 
 cap unab extra_vars : group_* repeat_group_*
 
 order order within_order name question_type preloaded varlabel vallabel full_question ///
-	conditions repeated repeat_group repeat_group_name repeat_group_label ///
+	conditions repeated repeat_group `rp_vars' ///
 	`extra_vars'
 	
 cap drop __*
@@ -957,6 +963,14 @@ if "`mv'" != "" file write myfile ///
 	`"mvdecode _all, mv(`mv')"' _n(2)
 		
 if `want_reshape' == 1 {
+	
+	cap assert `repeat_groups' > 0
+	if _rc {
+		
+		display as error "No repeat groups in survey" 
+		break
+		
+	}
 	
 	display regexm("`instname'", "[^\\/]+$")
 	local file_short = regexs(0)
