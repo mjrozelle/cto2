@@ -1,0 +1,9 @@
+v 1.0.0
+d 'CTO2': cto2
+d 
+d Command for importing and cleaning SurveyCTO-exported data
+d 
+d Distribution-Date:   20240411
+d License: Academic Free License v3.0
+d 
+F cto2.ado cto2.sthlp

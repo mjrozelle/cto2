@@ -1,0 +1,8 @@
+v 1.0.0
+d Materials by Michael Rozelle
+d Wageningen University and Research
+d michael.rozelle@wur.nl
+
+d 'cto2': Command for importing and cleaning SurveyCTO-exported data
+
+p cto2
