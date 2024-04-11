@@ -24,9 +24,9 @@
 {synopthdr}
 {synoptline}
 {syntab :Necessary}
-{synopt :{opt INSTname:string(filepath)}}filepath to Excel survey instrument{p_end}
-{synopt :{opt DATAname:string(filepath)}}filepath to .csv SurveyCTO-exported data{p_end}
-{synopt :{opt DOfile:string(filepath)}}filepath to import dofile to be created{p_end}
+{synopt :{opt INSTname:(filepath)}}filepath to Excel survey instrument{p_end}
+{synopt :{opt DATAname:(filepath)}}filepath to .csv SurveyCTO-exported data{p_end}
+{synopt :{opt DOfile:(filepath)}}filepath to import dofile to be created{p_end}
 
 {syntab :Optional}
 {synopt :{opt RESHAPEfile:(filepath)}}filepath to create a reshape dofile for long format{p_end}
