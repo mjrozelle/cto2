@@ -15,9 +15,9 @@
 {p 8 17 2}
 {cmd:cto2}
 {cmd:,}
-{opt INSTname:string(filepath)}
-{opt DATAname:string(filepath)}
-{opt DOfile:string(filepath)}
+{opt INSTname:(filepath)}
+{opt DATAname:(filepath)}
+{opt DOfile:(filepath)}
 [{it:options}]
 
 {synoptset 27 tabbed}{...}
@@ -29,15 +29,15 @@
 {synopt :{opt DOfile:string(filepath)}}filepath to import dofile to be created{p_end}
 
 {syntab :Optional}
-{synopt :{opt RESHAPEfile:string(filepath)}}filepath to create a reshape dofile for long format{p_end}
+{synopt :{opt RESHAPEfile:(filepath)}}filepath to create a reshape dofile for long format{p_end}
 {synopt :{opt IDENTIFIERS(namelist)}}specify survey unique identifier (usually "key"){p_end}
 {synopt :{opt AMERICAN}}read dates in MM/DD/YYYY format{p_end}
-{synopt :{opt SAVEfolder:string(filepath)}}filepath to the folder for saving datasets{p_end}
+{synopt :{opt SAVEfolder:(filepath)}}filepath to the folder for saving datasets{p_end}
 {synopt :{opt FRGETVARS(namelist)}}variables to copy to all reshaped datasets{p_end}
 {synopt :{opt DEIDVARS(namelist)}}variables to remove for deidentification{p_end}
-{synopt :{opt DK(integer 1)}}value for "don't know" responses{p_end}
-{synopt :{opt OTHER(integer 1)}}value for "other (specify)" responses{p_end}
-{synopt :{opt REFUSED(integer 1)}}value for "refused to answer" responses{p_end}
+{synopt :{opt DK(integer)}}value for "don't know" responses{p_end}
+{synopt :{opt OTHER(integer)}}value for "other (specify)" responses{p_end}
+{synopt :{opt REFUSED(integer)}}value for "refused to answer" responses{p_end}
 {synopt :{opt RENAME}}rename variables as specified in "new_name" column of instrument{p_end}
 
 {title:Description}
