@@ -1,5 +1,5 @@
-local dependencies findregex
-local aux findregex
+local dependencies findregex missings
+local aux findregex missings
 
 foreach dependency in `dependencies' {
 	
