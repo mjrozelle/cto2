@@ -11,5 +11,5 @@ make cto2, replace toc pkg readme version(1.0.0)                             ///
      url("")                                                                 ///
      title("cto2")                                                           ///
      description("Command for importing and cleaning SurveyCTO-exported data") ///
-     install("cto2.ado;cto2.sthlp")                                 ///
-     iancillary("")                                                         
+     install("cto2.ado")                        ///
+     iancillary("cto2.sthlp")         
