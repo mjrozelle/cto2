@@ -960,7 +960,8 @@ if "`mv'" != "" file write myfile ///
 	"`hbanner'" ///
 	_n "* 	Replacing Missing Values" _n /// 
 	"`hbanner'" _n(2) /// 
-	`"mvdecode _all, mv(`mv')"' _n(2)
+	`"mvdecode _all, mv(`mv')"' _n(2) ///
+	`"cap drop __*"'
 		
 if `want_reshape' == 1 {
 	
