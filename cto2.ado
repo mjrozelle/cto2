@@ -1196,6 +1196,9 @@ if `want_reshape' == 1 {
 			
 		}
 		
+		file write myfile2 ///
+			`"keep \`varlist_0' key instanceID formdef_version"' _n
+		
 		if "`deidvars'" != "" {
 			
 			file write myfile2 _n ///
@@ -1210,7 +1213,6 @@ if `want_reshape' == 1 {
 		if "`savefolder'" != "" {
 				
 				file write myfile2 ///
-					`"keep \`varlist_0' key instanceID formdef_version"' _n ///
 					`"compress"' _n ///
 					`"save "`macval(savefolder)'/survey.dta", replace"' _n
 				
