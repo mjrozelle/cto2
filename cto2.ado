@@ -1195,13 +1195,10 @@ if `want_reshape' == 1 {
 			file write myfile2 `"cwf survey"' _n(2)
 			
 		}
-		
-		if "`savefolder'" != "" {
 				
-			file write myfile2 ///
-				`"keep \`varlist_0' key instanceID formdef_version"' _n
+		file write myfile2 ///
+			`"keep \`varlist_0' key instanceID formdef_version"' _n
 				
-		}
 		if "`deidvars'" != "" {
 	
 				file write myfile2 _n ///
