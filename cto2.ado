@@ -1061,7 +1061,7 @@ if `want_reshape' == 1 {
 				`"keep \`varlist_`g'' \`added_vars' *key"' _n ///
 				`"if "\`added_vars'" != "" order \`added_vars'"' _n ///
 				`"label data "`desc_`g''-level data from `file_short'""' _n
-				
+		
 			if "`deidvars'" != "" {
 			
 				file write myfile2 _n ///
@@ -1196,24 +1196,27 @@ if `want_reshape' == 1 {
 			
 		}
 		
-		if "`deidvars'" != "" {
-			
-			file write myfile2 _n ///
-			`"ds"' _n ///
-			`"local currvars \`r(varlist)'"' _n ///
-			`"local vars_to_drop : list deidvars & currvars"' _n ///
-			`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
-			
-		}
-		
-		
 		if "`savefolder'" != "" {
 				
-				file write myfile2 ///
-					`"keep \`varlist_0' key instanceID formdef_version"' _n ///
-					`"compress"' _n ///
-					`"save "`macval(savefolder)'/survey.dta", replace"' _n
+			file write myfile2 ///
+				`"keep \`varlist_0' key instanceID formdef_version"' _n
 				
+		}
+		if "`deidvars'" != "" {
+	
+				file write myfile2 _n ///
+				`"ds"' _n ///
+				`"local currvars \`r(varlist)'"' _n ///
+				`"local vars_to_drop : list deidvars & currvars"' _n ///
+				`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
+				
+		}
+		if "`savefolder'" != "" {
+			
+			file write myfile2 ///
+				`"compress"' _n ///
+				`"save "`macval(savefolder)'/survey.dta", replace"' _n
+			
 		}
 		
 		file close myfile2
