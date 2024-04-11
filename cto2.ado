@@ -8,19 +8,19 @@ cap program drop cto2
 program define cto2, rclass
 // instrument, then dataset, then dofile
 syntax, ///
-	INSTname(string) ///
-	DATAname(string) ///
-	DOfile(string) ///
-	[RESHAPEfile(string) ///
-	IDENTIFIERS(namelist) ///
-	AMERICAN ///
-	SAVEfolder(string) ///
-	FRGETVARS(namelist) ///
-	DEIDVARS(namelist) ///
-	DK(integer 1) ///
-	OTHER(integer 1) ///
-	REFUSED(integer 1) ///
-	RENAME]
+	INSTname(string) /// filepath to the Excel survey instrument
+	DATAname(string) /// filepath to the .csv data exported from SurveyCTO
+	DOfile(string) /// filepath to the import dofile you want to create
+	[RESHAPEfile(string) /// filepath to the reshape dofile you want to create
+	IDENTIFIERS(namelist) /// survey unique identifier (usually "key")
+	AMERICAN /// use if data were exported in MM/DD/YYYY format, otherwise default to DD/MM/YYYY
+	SAVEfolder(string) /// filepath to the folder where all datasets should be saved
+	FRGETVARS(namelist) /// variables you want to copy downstream to all reshaped datasets
+	DEIDVARS(namelist) /// variables that identify respondents and need to be removed for deidentifying the dataset
+	DK(integer 1) /// value used to indicate "don't know" responses
+	OTHER(integer 1) /// value used to indicate "other (specify)" responses
+	REFUSED(integer 1) /// value used to indicate "refused to answer" responses
+	RENAME] // use if you have filled in the "new_name" column and wish to rename variables
 	
 pause on
 
@@ -1061,7 +1061,7 @@ if `want_reshape' == 1 {
 				`"keep \`varlist_`g'' \`added_vars' *key"' _n ///
 				`"if "\`added_vars'" != "" order \`added_vars'"' _n ///
 				`"label data "`desc_`g''-level data from `file_short'""' _n
-		
+				
 			if "`deidvars'" != "" {
 			
 				file write myfile2 _n ///
@@ -1195,25 +1195,25 @@ if `want_reshape' == 1 {
 			file write myfile2 `"cwf survey"' _n(2)
 			
 		}
-				
-		file write myfile2 ///
-			`"keep \`varlist_0' key instanceID formdef_version"' _n
-				
+		
 		if "`deidvars'" != "" {
-	
-				file write myfile2 _n ///
-				`"ds"' _n ///
-				`"local currvars \`r(varlist)'"' _n ///
-				`"local vars_to_drop : list deidvars & currvars"' _n ///
-				`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
-				
+			
+			file write myfile2 _n ///
+			`"ds"' _n ///
+			`"local currvars \`r(varlist)'"' _n ///
+			`"local vars_to_drop : list deidvars & currvars"' _n ///
+			`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
+			
 		}
+		
+		
 		if "`savefolder'" != "" {
-			
-			file write myfile2 ///
-				`"compress"' _n ///
-				`"save "`macval(savefolder)'/survey.dta", replace"' _n
-			
+				
+				file write myfile2 ///
+					`"keep \`varlist_0' key instanceID formdef_version"' _n ///
+					`"compress"' _n ///
+					`"save "`macval(savefolder)'/survey.dta", replace"' _n
+				
 		}
 		
 		file close myfile2
