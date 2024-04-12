@@ -514,9 +514,10 @@ foreach jump in begin end {
 	}
 }
 
-
 gen group = .
 gen conditions = relevant // survey logic for the question
+
+if `q_groups' > 0 {
 
 /* 
 Now, we're working on defining the enablement conditions for each question.
@@ -544,7 +545,6 @@ frame `groups_long' {
 	expand diff + 1
 	sort group
 	bysort group: gen order = start[1] + _n - 1
-	cwf `groups_long'
 	keep order group group_condition
 	bysort order (group): gen dum = _n
 	reshape wide group group_condition, i(order) j(dum)
@@ -567,6 +567,8 @@ forvalues i = 1/`q_groups' {
 	egen group_`i' = anymatch(`gvars'), values(`i')
 	label variable group_`i' "question in group `i'"
 	
+}
+
 }
 
 egen unlock = concat(conditions `convars'), punct("; ")
