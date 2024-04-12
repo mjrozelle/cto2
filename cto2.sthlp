@@ -30,15 +30,18 @@
 
 {syntab :Optional}
 {synopt :{opt RESHAPEfile:(filepath)}}filepath to create a reshape dofile for long format{p_end}
-{synopt :{opt IDENTIFIERS(namelist)}}specify survey unique identifier (usually "key"){p_end}
-{synopt :{opt AMERICAN}}read dates in MM/DD/YYYY format{p_end}
 {synopt :{opt SAVEfolder:(filepath)}}filepath to the folder for saving datasets{p_end}
+{synopt :{opt IDENTIFIERS(namelist)}}specify survey unique identifier (usually "key"){p_end}
 {synopt :{opt FRGETVARS(namelist)}}variables to copy to all reshaped datasets{p_end}
 {synopt :{opt DEIDVARS(namelist)}}variables to remove for deidentification{p_end}
+{synopt :{opt STRING(namelist)}}force named variables to be formatted as string{p_end}
+{synopt :{opt NUMERIC(namelist)}}force named variables to be formatted as numeric{p_end}
 {synopt :{opt DK(integer)}}value for "don't know" responses{p_end}
 {synopt :{opt OTHER(integer)}}value for "other (specify)" responses{p_end}
 {synopt :{opt REFUSED(integer)}}value for "refused to answer" responses{p_end}
 {synopt :{opt RENAME}}rename variables as specified in "new_name" column of instrument{p_end}
+{synopt :{opt AMERICAN}}read dates in MM/DD/YYYY format{p_end}
+{synopt :{opt REPLACE}}required to replace existing dofiles{p_end}
 
 {title:Description}
 

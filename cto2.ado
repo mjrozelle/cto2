@@ -20,7 +20,10 @@ syntax, ///
 	DK(integer 1) /// value used to indicate "don't know" responses
 	OTHER(integer 1) /// value used to indicate "other (specify)" responses
 	REFUSED(integer 1) /// value used to indicate "refused to answer" responses
-	RENAME] // use if you have filled in the "new_name" column and wish to rename variables
+	RENAME /// use if you have filled in the "new_name" column and wish to rename variables
+	REPLACE /// use to replace existing dofiles
+	NUMERIC(namelist) /// use to force numeric variables to be read as numeric
+	STRING(namelist)] // use to force string variables to be read as string
 	
 pause on
 
@@ -31,6 +34,24 @@ qui {
 	
 preserve 
 local original_frame `c(frame)'
+
+cap confirm file "`dofile'"
+if !_rc & "`replace'" == "" {
+	
+	display as error "file `macval(dofile)' already exists."
+	display as error "add option {bf:replace} if you wish to overwrite it."
+	break 
+	
+}
+
+cap confirm file "`reshapefile'"
+if !_rc & "`replace'" == "" & "`reshapefile'" != "" {
+	
+	display as error "file `macval(reshapefile)' already exists."
+	display as error "add option {bf:replace} if you wish to overwrite it."
+	break
+	
+}
 
 if "`identifiers'" == "" {
 	
@@ -278,6 +299,14 @@ local regex_stubs: subinstr local numeric_formulae " " "|" , all
 local regex_pattern "^(?:`regex_stubs')\("
 gen numeric_calculate = ustrregexm(calculation, "`regex_pattern'")
 
+local regex_stubs_2 : subinstr local numeric " " "|", all
+local regex_pattern "^`regex_stubs_2'$"
+gen numeric_force = ustrregexm(name, "`regex_pattern'")
+
+local regex_stubs_3 : subinstr local string " " "|", all
+local regex_pattern "^`regex_stubs_3'$"
+gen string_force = ustrregexm(name, "`regex_pattern'")
+
 label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
 	4 "Numeric" 5 "Date" 6 "Datetime" 7 "GPS" ///
 	-111 "Group Boundary" -222 "Note" ///
@@ -285,10 +314,10 @@ label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
 gen question_type=.
 label values question_type question_type_M
 replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace") ///
-	| preloaded==1 | (type == "calculate" & numeric_calculate == 0)
-replace question_type = 2 if word(type, 1)=="select_one"
-replace question_type = 3 if word(type, 1)=="select_multiple"
-replace question_type = 4 if !inlist(type, "date", "text") & missing(question_type)
+	| preloaded==1 | (type == "calculate" & numeric_calculate == 0) | string_force == 1
+replace question_type = 2 if word(type, 1) == "select_one" & missing(question_type)
+replace question_type = 3 if word(type, 1) == "select_multiple"
+replace question_type = 4 if (!inlist(type, "date", "text") & missing(question_type)) | numeric_force == 1
 replace question_type = 5 if inlist(type, "date", "today")
 replace question_type = 6 if inlist(type, "start", "end", "submissiondate")
 replace question_type= 7 if type == "geopoint"
