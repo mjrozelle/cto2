@@ -40,7 +40,7 @@ if !_rc & "`replace'" == "" {
 	
 	display as error "file `macval(dofile)' already exists."
 	display as error "add option {bf:replace} if you wish to overwrite it."
-	break 
+	exit 602
 	
 }
 
@@ -49,7 +49,7 @@ if !_rc & "`replace'" == "" & "`reshapefile'" != "" {
 	
 	display as error "file `macval(reshapefile)' already exists."
 	display as error "add option {bf:replace} if you wish to overwrite it."
-	break
+	exit 602
 	
 }
 
