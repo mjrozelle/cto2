@@ -209,6 +209,7 @@ replace label = subinstr(label, "$", "#", .)
 
 // Remove any double quotes from the "label" variable
 replace label = subinstr(label, `"""', "", .)
+replace label = subinstr(label, char(10), "", .)
 
 // Remove any spaces from the "list_name" variable
 replace list_name = subinstr(list_name, " ", "", .)
@@ -651,20 +652,22 @@ if `repeat_groups' > 0 {
 	
 }
 
-tempname long_qs
-frame copy `qs' `long_qs'
-
-frame `long_qs' { 
+gen within_order = .
+clonevar original_name = name 
+clonevar desired_varname = name 
+if "`rename'" != "" {
 	
-	gen within_order = .
-	clonevar original_name = name 
+	replace desired_varname = new_name if !missing(new_name)
 	
 }
+
+tempname long_qs
+frame copy `qs' `long_qs'
 
 levelsof order if question_type == 3, clean local(mult_selects)
 foreach i in `mult_selects' {
 	
-	local name = name[`i']
+	local name = desired_varname[`i']
 	local vallabel = type2[`i']
 	
 	frame `choices' {
@@ -689,7 +692,7 @@ foreach i in `mult_selects' {
 			frame `choices': local lab = label[`row']
 			frame `qs': local labstat = labelStata[`i']
 			
-			replace name = name + "_" + "`value'" if order == `i' & within_order == `s'
+			replace desired_varname = desired_varname + "_" + "`value'" if order == `i' & within_order == `s'
 			replace labelStata = "#{`name'}: `lab'" if order == `i' & within_order == `s'
 		
 		}
@@ -710,7 +713,7 @@ foreach i in `gps' {
 		foreach f in Accuracy Latitude Longitude Altitude {
 			
 			local ++s
-			replace name = name + "`f'" if within_order == `s' & order == `i'
+			replace desired_varname = desired_varname + "`f'" if within_order == `s' & order == `i'
 			replace labelStata = labelStata + ": `f'" if within_order == `s' & order == `i'
 			
 		}
@@ -720,26 +723,19 @@ foreach i in `gps' {
 }
 
 cwf `long_qs'
-assert !missing(name)
+assert !missing(desired_varname)
 
 // solving problem of duplicate names...
-bysort name (order): keep if _n == 1
+bysort desired_varname (order): keep if _n == 1
 
 sort order within_order 
 gen new_order = _n
 
 // storing list of previous varnames
-clonevar vlist = name
+clonevar vlist = desired_varname
 
 // actual varlist in raw data
-clonevar varlist = name
-
-clonevar desired_varname = name 
-if "`rename'" != "" {
-	
-	replace desired_varname = new_name if !missing(new_name)
-	
-}
+clonevar varlist = desired_varname
 
 clonevar shapelist = desired_varname
 gen shapelist_lag = desired_varname
@@ -748,6 +744,12 @@ replace varlist = "" if repeated == 1
 if `repeat_groups' > 0 {
 	
 	forvalues r = 1/`repeat_groups' {
+		
+		if `repeats_`r'' == 0 {
+			
+			continue
+			
+		}
 		
 		replace shapelist = ustrregexra(shapelist_lag, "(\b\w+\b)", "$1_ ") ///
 				if repeat_group_`r' == 1
@@ -770,15 +772,17 @@ if `repeat_groups' > 0 {
 			unab lvars : shapelist*
 			egen macro_1 = concat(`lvars'), punct(" ")
 			local shapelist = macro_1[1]
+			// remove anything longer than 32 characters
+			local shapelist = ustrregexra("`shapelist'", "([a-zA-Z][a-zA-Z0-9_]{31,})", "", .)
 			
 		}
-		
+
 		frame `commands': replace dataset_`r' = dataset_`r' + stritrim("`shapelist'")
 		
 		replace vlist = varlist if repeat_group_`r' == 1
 		replace shapelist = vlist if repeat_group_`r' == 1
 		
-		replace shapelist_lag = ustrregexra(vlist, name, desired_varname) if repeat_group_`r' == 1
+		replace shapelist_lag = vlist if repeat_group_`r' == 1
 		
 		replace varlist = ""
 		
@@ -801,22 +805,22 @@ replace format_command = "cap tostring " + var_stub + ", replace`brek'cap replac
 replace format_command = "cap destring " + var_stub + ", replace" ///
 	if inlist(question_type, 2, 4, 7) | (question_type == 3 & within_order > 1)
 
-replace format_command = "tempvar date`brek'clonevar \`date' = " + var_stub + ///
+replace format_command = "tempvar date`brek'cap clonevar \`date' = " + var_stub + ///
 	"`brek'cap replace " + var_stub + `" = """' + ///
-	"`brek'if _rc replace " + var_stub + `" = ."' + ///
-	"`brek'destring " + var_stub + ", replace" + ///
+	"`brek'if _rc cap replace " + var_stub + `" = ."' + ///
+	"`brek'cap destring " + var_stub + ", replace" + ///
 	"`brek'cap replace " + var_stub + `" = date(\`date', "`datestyle'", 2030)"' + ///
 	`" if !missing(\`date')"' + ///
-	+ `"`brek'format "' + var_stub + `" %td"' ///
+	+ `"`brek'cap format "' + var_stub + `" %td"' ///
 	if question_type == 5
 
-replace format_command = "tempvar date`brek'clonevar \`date' = " + var_stub + ///
+replace format_command = "tempvar date`brek'cap clonevar \`date' = " + var_stub + ///
 	"`brek'cap replace " + var_stub + `" = """' + ///
-	"`brek'if _rc replace " + var_stub + `" = ."' + ///
-	"`brek'destring " + var_stub + ", replace" + ///
+	"`brek'if _rc cap replace " + var_stub + `" = ."' + ///
+	"`brek'cap destring " + var_stub + ", replace" + ///
 	"`brek'cap replace " + var_stub + `" = clock(\`date', "`datestyle'hms", 2030)"' + ///
 	`" if !missing(\`date')"' + ///
-	+ `"`brek'format "' + var_stub + `" %tc"' ///
+	+ `"`brek'cap format "' + var_stub + `" %tc"' ///
 	if question_type == 6
 	
 assert !missing(format_command)
@@ -828,7 +832,8 @@ gen notes_command = "cap notes " + var_stub + ": " + labelEnglishen + ///
 	"`brek'cap notes " + var_stub + ": relevance conditions: " + unlock
 	
 gen command = "`hbanner'`brek'*`tab2'" + name + "`brek'`hbanner'`brek2'" 
-replace command = command + "foreach var of varlist " + vlist + "{`brek2'" if num_vars > 1
+replace command = command + "cap foreach var of varlist " + vlist + ///
+	"{`brek2'cap confirm variable " + var_stub + "`brek'if _rc continue`brek2'" if num_vars > 1
 replace command = command + label_command + "`brek'" + format_command + ///
 	"`brek'" + values_command + "`brek'" + notes_command
 	
@@ -876,6 +881,12 @@ if `repeat_groups' > 0 {
 	local rp_vars repeat_group_name repeat_group_label
 	
 }
+else {
+	
+	gen repeat_group_name = "survey"
+	gen repeat_group_label = "Survey-level"
+	
+}
 	
 rename desired_varname name
 rename labelStata varlabel
@@ -887,6 +898,7 @@ rename new_order order
 rename lowest_level repeat_group
 
 replace repeat_group_name = "survey" if repeat_group == 0
+replace repeat_group_label = "Survey-level" if repeat_group == 0
 
 label variable order "order of appearance in instrument"
 label variable within_order "order of appearance for variables generated by single line"
@@ -941,7 +953,7 @@ file write myfile ///
 	"`hbanner'" ///
 	_n "* 	Import" _n /// 
 	"`hbanner'" _n(2) ///
-	`"import delimited "`macval(dataname)'", clear bindquote(strict) case(preserve)"' _n(2) ///
+	`"import delimited "`macval(dataname)'", clear bindquote(strict) case(preserve) maxquotedrows(unlimited)"' _n(2) ///
 	"`hbanner'" ///
 	_n "* 	Labels" _n /// 
 	"`hbanner'" _n(2) 
@@ -1011,8 +1023,8 @@ if `want_reshape' == 1 {
 	
 	frame `repeat_group_long' {
 		
-		levelsof group if missing(group1), clean local(standalone)
-		levelsof group if !missing(group1), clean local(nesteds)
+		levelsof group if missing(group1) & repetitions > 0, clean local(standalone)
+		levelsof group if !missing(group1) & repetitions > 0, clean local(nesteds)
 		
 		cap file close myfile2
 		file open myfile2 using "`reshapefile'", write text replace
