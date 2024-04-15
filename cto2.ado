@@ -693,6 +693,7 @@ foreach i in `mult_selects' {
 			frame `qs': local labstat = labelStata[`i']
 			
 			replace desired_varname = desired_varname + "_" + "`value'" if order == `i' & within_order == `s'
+			replace name = name + "_" + "`value'" if order == `i' & within_order == `s'
 			replace labelStata = "#{`name'}: `lab'" if order == `i' & within_order == `s'
 		
 		}
@@ -714,6 +715,7 @@ foreach i in `gps' {
 			
 			local ++s
 			replace desired_varname = desired_varname + "`f'" if within_order == `s' & order == `i'
+			replace name = name + "`f'" if within_order == `s' & order == `i'
 			replace labelStata = labelStata + ": `f'" if within_order == `s' & order == `i'
 			
 		}
@@ -732,32 +734,38 @@ sort order within_order
 gen new_order = _n
 
 // storing list of previous varnames
-clonevar vlist = desired_varname
+clonevar vlist = name
+clonevar vlist2 = desired_varname
 
 // actual varlist in raw data
-clonevar varlist = desired_varname
+clonevar varlist = name
+clonevar varlist2 = desired_varname
 
 clonevar shapelist = desired_varname
-gen shapelist_lag = desired_varname
-replace varlist = "" if repeated == 1
+clonevar shapelist_lag = desired_varname
 
+replace varlist = "" if repeated == 1
+replace varlist2 = "" if repeated == 1
 if `repeat_groups' > 0 {
 	
 	forvalues r = 1/`repeat_groups' {
 		
-		if `repeats_`r'' == 0 {
-			
-			continue
-			
-		}
+		if `repeats_`r'' == 0 continue
 		
 		replace shapelist = ustrregexra(shapelist_lag, "(\b\w+\b)", "$1_ ") ///
 				if repeat_group_`r' == 1
 		
 		forvalues i = 1/`repeats_`r'' {
 			
-			replace varlist = varlist + ustrregexra(vlist, "(\b\w+\b)", "$1_`i' ") ///
+			replace varlist = varlist + " " + ustrregexra(vlist, "(\b\w+\b)", "$1_`i' ") ///
 				if repeat_group_`r' == 1
+				
+			replace varlist = strtrim(stritrim(varlist))
+				
+			replace varlist2 = varlist2 + " " + ustrregexra(vlist2, "(\b\w+\b)", "$1_`i' ") ///
+				if repeat_group_`r' == 1
+				
+			replace varlist2 = strtrim(stritrim(varlist2))
 			
 		}
 		
@@ -780,12 +788,12 @@ if `repeat_groups' > 0 {
 		frame `commands': replace dataset_`r' = dataset_`r' + stritrim("`shapelist'")
 		
 		replace vlist = varlist if repeat_group_`r' == 1
-		replace shapelist = vlist if repeat_group_`r' == 1
-		
-		replace shapelist_lag = vlist if repeat_group_`r' == 1
+		replace vlist2 = varlist2 if repeat_group_`r' == 1
+		replace shapelist_lag = vlist2 if repeat_group_`r' == 1
 		
 		replace varlist = ""
-		
+		replace varlist2 = ""
+
 	} 
 
 	drop varlist shapelist
@@ -840,7 +848,7 @@ replace command = command + label_command + "`brek'" + format_command + ///
 if "`rename'" != "" {
 	
 	gen rename_command = `"`brek'cap rename "' + var_stub + `" \`=ustrregexrf(""' + ///
-		var_stub + `"", ""' + original_name + `"", ""' + new_name + `"")'"' ///
+		var_stub + `"", "^"' + original_name + `"", ""' + new_name + `"")'"' ///
 		if !missing(new_name)
 	
 	replace command = command + rename_command
