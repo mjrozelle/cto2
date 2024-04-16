@@ -265,7 +265,7 @@ local brek = char(10)
 
 // Remove any line breaks, dollar signs, and double quotes from the "labelEnglishen", "labelStata", and "relevant" variables
 foreach var of varlist labelEnglishen labelStata relevant {
-	replace `var' = subinstr(`var', "`brek'", "", .)
+	replace `var' = subinstr(`var', char(10), "", .)
 	replace `var' = subinstr(`var', "$", "#", .) 
 	replace `var' = subinstr(`var', `"""', "", .)
 	/* Stata will intepret dollar signs as globals, and as a result, we won't 
