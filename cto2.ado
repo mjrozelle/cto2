@@ -343,6 +343,9 @@ frame `groups' {
 	gen group_uid = _n
 	labmask group_uid, values(label)
 	
+	label define group_type 1 "Standard Group" 2 "Repeat Group"
+	label values type group_type
+	
 }
 
 if `n_repeats' != 0 {
@@ -786,7 +789,12 @@ label variable repetitions "number of repeats for repeat group this variable was
 label variable within "repeat group this repeated variable is nested inside"
 label variable command "import dofile command for this variable"
 
-if "`savefolder'" != "" save "`savefolder'/survey_metadata.dta", replace
+if "`savefolder'" != "" {
+	
+	frame `codebook': save "`savefolder'/survey_metadata.dta", replace
+	frame `groups': save "`savefolder'/group_metadata.dta", replace
+	
+}
 
 cwf `qs'
 
