@@ -754,7 +754,7 @@ tempname codebook
 frame copy `qs' `codebook'
 cwf `codebook'
 
-drop order __* vlist desired_vlist shape_vlist label_command format_command ///
+drop __* vlist desired_vlist shape_vlist label_command format_command ///
 	values_command notes_command var_stub num_vars string_force numeric_force ///
 	note repeat_count type name numeric_calculate
 	
@@ -763,7 +763,8 @@ label define group_label `group_label'
 
 label values repeat_group within repeat_label
 label values group group_label
-	
+
+rename order var_uid	
 rename desired_varname name
 rename labelStata varlabel
 rename labelEnglishen full_question
@@ -788,6 +789,7 @@ label variable preloaded "preloaded variable"
 label variable repetitions "number of repeats for repeat group this variable was in"
 label variable within "repeat group this repeated variable is nested inside"
 label variable command "import dofile command for this variable"
+label variable var_uid "variable unique ID"
 
 if "`savefolder'" != "" {
 	
