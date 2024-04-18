@@ -120,6 +120,8 @@ cwf `qs'
 // Import the "survey" sheet from the instrument Excel file specified by the "instname" variable
 import excel "`instname'", firstrow clear sheet(survey) 
 
+missings dropobs, force
+
 if "`rename'" != "" local rencheck new_name
 
 // Loop over a list of variables and ensure that they exist in the dataset
@@ -165,6 +167,255 @@ foreach v of varlist labelEnglishen labelStata repeat_count relevant {
 // Replace any missing Stata labels with the English labels
 replace labelStata = "" if labelStata=="."
 replace labelStata = labelEnglishen if missing(labelStata)
+
+replace type = strtrim(stritrim(type))
+replace type = subinstr(type, " ", "_", .) ///
+	if inlist(type, "begin group", "end group", "begin repeat", "end repeat")
+	
+// Remove any line breaks, dollar signs, and double quotes from the "labelEnglishen", "labelStata", and "relevant" variables
+foreach var of varlist labelEnglishen labelStata relevant {
+	replace `var' = subinstr(`var', char(10), "", .)
+	replace `var' = subinstr(`var', "$", "#", .) 
+	replace `var' = subinstr(`var', `"""', "", .)
+	/* Stata will intepret dollar signs as globals, and as a result, we won't 
+	be able to see the questions being referenced for constraints (or even 
+	inside the question itself). By changing the dollar sign to a #, we can 
+	still see these references in the variable labels and notes */
+}
+
+// Replace any full stops in variable names with an empty string
+replace name = subinstr(name, ".", "", .) 
+
+// Split the "type" variable into two variables, "type" and "type2"
+split type 
+// Note that "type2" will contain the value label name for categorical variables.
+
+*------------------------------------------------------------------
+*	Question Types
+*------------------------------------------------------------------
+
+gen preloaded = regexm(calculation, "^pulldata")
+gen note = type == "note"
+
+local numeric_formulae index area number round count count-if sum ///
+	sum-if min min-if max max-if distance-between int abs duration
+local regex_stubs: subinstr local numeric_formulae " " "|" , all
+local regex_pattern "^(?:`regex_stubs')\("
+gen numeric_calculate = ustrregexm(calculation, "`regex_pattern'")
+
+local regex_stubs_2 : subinstr local numeric " " "|", all
+local regex_pattern "^`regex_stubs_2'$"
+gen numeric_force = ustrregexm(name, "`regex_pattern'")
+
+local regex_stubs_3 : subinstr local string " " "|", all
+local regex_pattern "^`regex_stubs_3'$"
+gen string_force = ustrregexm(name, "`regex_pattern'")
+
+label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
+	4 "Numeric" 5 "Date" 6 "Datetime" 7 "GPS" ///
+	-111 "Group Boundary" -222 "Note" ///
+	-333 "Geopoint" -555 "Other" 
+	
+gen question_type=.
+
+label values question_type question_type_M
+
+replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace") ///
+	| preloaded==1 ///
+	| (type == "calculate" & numeric_calculate == 0) ///
+	| string_force == 1
+	
+replace question_type = 2 if word(type, 1) == "select_one" ///
+	& missing(question_type)
+
+replace question_type = 3 if word(type, 1) == "select_multiple"
+
+replace question_type = 4 if (!inlist(type, "date", "text") & missing(question_type)) ///
+	| numeric_force == 1
+
+replace question_type = 5 if inlist(type, "date", "today")
+
+replace question_type = 6 if inlist(type, "start", "end", "submissiondate")
+
+replace question_type= 7 if type == "geopoint"
+
+replace question_type = -111 if inlist(type, "begin_group", "end_group", ///
+	"begin_repeat", "end_repeat")
+replace question_type = -222 if note==1
+replace question_type = -333 if type == "text audit"
+replace question_type = -555 if missing(question_type)
+
+drop if question_type < -111
+
+// Create a new variable called "order" to retain the original order of variables in the instrument
+gen order = _n
+	
+*===============================================================================
+* 	Make Groups Dataset
+*===============================================================================
+
+tempname groups
+frame create `groups' int type strL name strL label strL repeat_count ///
+	int repetitions int instrument_row int index strL conditions int within ///
+	strL example_var int layers_nested
+
+local n_groups = 0
+local n_repeats = 0
+local grouplist 0
+local r_grouplist 0
+local group_label 0 "Survey-level"
+local repeat_label 0 "Survey-level"
+
+gen group = 0
+gen repeat_group = 0
+
+sort order
+forvalues i = 1/`c(N)' {
+	
+	local j = `i' + 1
+	
+	if type[`i'] == "begin_group" { 
+		
+		local ++n_groups
+		local grouplist `grouplist' `n_groups'
+		local group_label `group_label' `n_groups' "`=labelStata[`i']'"
+		
+		local type = question_type[`j']
+		while `type' == 7 {
+			
+			++j
+			local type = question_type[`j']
+			
+		}
+		
+		frame post `groups' (1) (name[`i']) (labelStata[`i']) ///
+			(repeat_count[`i']) (.) (`i') (`n_groups') (relevant[`i']) ///
+			(`=real(word("`grouplist'", -2))') (name[`j']) (0)
+		
+	}
+		
+	else if type[`i'] == "begin_repeat" {
+		
+		local ++n_repeats
+		local r_grouplist `r_grouplist' `n_repeats'
+		local repeat_label `repeat_label' `n_repeats' "`=labelStata[`i']'"
+		
+		local type = question_type[`j']
+		while `type' == 7 {
+			
+			++j
+			local type = question_type[`j']
+			
+		}
+		
+		frame post `groups' (2) (name[`i']) (labelStata[`i']) ///
+			(repeat_count[`i']) (.) (`i') (`n_repeats') (relevant[`i']) ///
+			(`=real(word("`r_grouplist'", -2))') (name[`j']) (0)
+		
+	}
+	
+	else if type[`i'] == "end_group" {
+		
+		local grouplist = ///
+			substr("`grouplist'", 1, length("`grouplist'") ///
+			- strlen(word("`grouplist'", -1)))
+		
+	}
+	
+	else if type[`i'] == "end_repeat" {
+		
+		local r_grouplist = ///
+			substr("`r_grouplist'", 1, length("`r_grouplist'") ///
+			- length(word("`r_grouplist'", -1)))
+		
+	}
+	
+	local current_group = word("`grouplist'", -1)
+	local current_repeat = word("`r_grouplist'", -1)
+	
+	replace group = `current_group' in `i'
+	replace repeat_group = `current_repeat' in `i'
+	
+}
+
+frame `groups' { 
+
+	gen group_uid = _n
+	labmask group_uid, values(label)
+	
+}
+
+if `n_repeats' != 0 {
+	
+	forvalues i = 1/`n_repeats' {
+		
+		frame `groups' {
+			
+			levelsof group_uid if type == 2 & index == `i', clean local(row)
+			local repeat_var = example_var[`row']
+			
+			local nest = within[`row']
+			local nested = `nest' != 0
+			local t = 0
+			while `nested' == 1 {
+				
+				local ++t
+				replace layers_nested = `t' in `row'
+				
+				local repeat_var `repeat_var'_1
+				levelsof group_uid if type == 2 & index == `nest', clean local(new_row)
+				
+				cap gen nest_level_`t' = .
+				replace nest_level_`t' = `nest' in `row'
+				
+				cap gen nest_repeats_`t' = .
+				replace nest_repeats_`t' = repetitions[`new_row'] in `row'
+				
+				local nest = within[`new_row']
+				local nested = `nest' != 0
+				
+			}
+			
+		} 
+
+		frame `rawdata' {
+						
+			findregex, re("^`repeat_var'_\d+") sensitive
+			local nested_varlist `s(varlist)'
+			local max_num = 0
+			foreach var in `nested_varlist' {
+				
+				local num = real(ustrregexra("`var'", ".*_(\d+)$", "$1"))
+				if (`num' > `max_num') local max_num = `num'
+				
+			}
+			
+		}
+			
+		frame `groups': replace repetitions = `max_num' in `row'
+		
+	}
+	
+	frame `groups' {
+	
+		sum layers_nested 
+		local nest_layers = `r(max)'
+		
+		if "`nest_layers'" !=  "" forvalues t = 1/`nest_layers' {
+	
+			local nest_vars `nest_vars' nest_level_`t' nest_repeats_`t'
+			local nest_repeat_vars `nest_repeat_vars' nest_repeats_`t'
+			
+		}
+	
+	}
+	
+}
+
+
+tempname repeat_groups
+frame copy `groups' `repeat_groups'
+frame `repeat_groups': drop if type == 1
 
 *===============================================================================
 * 	Choices
@@ -254,377 +505,15 @@ foreach listo in `list' {
 local labels_counter = `counter'-1
 
 *===============================================================================
-* 	Some Tidying
-*===============================================================================
-
-// Switch back to the "questions" frame
-cwf `qs' 
-
-// Create a local macro called "brek" containing a line break character
-local brek = char(10) 
-
-// Remove any line breaks, dollar signs, and double quotes from the "labelEnglishen", "labelStata", and "relevant" variables
-foreach var of varlist labelEnglishen labelStata relevant {
-	replace `var' = subinstr(`var', char(10), "", .)
-	replace `var' = subinstr(`var', "$", "#", .) 
-	replace `var' = subinstr(`var', `"""', "", .)
-	/* Stata will intepret dollar signs as globals, and as a result, we won't 
-	be able to see the questions being referenced for constraints (or even 
-	inside the question itself). By changing the dollar sign to a #, we can 
-	still see these references in the variable labels and notes */
-}
-
-// Replace any full stops in variable names with an empty string
-replace name = subinstr(name, ".", "", .) 
-
-replace type = strtrim(stritrim(type))
-replace type = subinstr(type, " ", "_", .) ///
-	if inlist(type, "begin group", "end group", "begin repeat", "end repeat")
-
-// Split the "type" variable into two variables, "type" and "type2"
-split type 
-// Note that "type2" will contain the value label name for categorical variables.
-
-// Create a new variable called "order" to retain the original order of variables in the instrument
-gen order = _n
-
-*------------------------------------------------------------------
-*	Question Types
-*------------------------------------------------------------------
-
-gen preloaded=regexm(calculation, "^pulldata") // If the variable is preloaded, we may want to be alerted to that fact
-gen note = type=="note" // Notes are useless to us, good to identify them here
-
-local numeric_formulae index area number round count count-if sum sum-if min min-if max max-if distance-between int abs duration
-local regex_stubs: subinstr local numeric_formulae " " "|" , all
-local regex_pattern "^(?:`regex_stubs')\("
-gen numeric_calculate = ustrregexm(calculation, "`regex_pattern'")
-
-local regex_stubs_2 : subinstr local numeric " " "|", all
-local regex_pattern "^`regex_stubs_2'$"
-gen numeric_force = ustrregexm(name, "`regex_pattern'")
-
-local regex_stubs_3 : subinstr local string " " "|", all
-local regex_pattern "^`regex_stubs_3'$"
-gen string_force = ustrregexm(name, "`regex_pattern'")
-
-label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
-	4 "Numeric" 5 "Date" 6 "Datetime" 7 "GPS" ///
-	-111 "Group Boundary" -222 "Note" ///
-	-333 "Geopoint" -555 "Other" 
-gen question_type=.
-label values question_type question_type_M
-replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace") ///
-	| preloaded==1 | (type == "calculate" & numeric_calculate == 0) | string_force == 1
-replace question_type = 2 if word(type, 1) == "select_one" & missing(question_type)
-replace question_type = 3 if word(type, 1) == "select_multiple"
-replace question_type = 4 if (!inlist(type, "date", "text") & missing(question_type)) | numeric_force == 1
-replace question_type = 5 if inlist(type, "date", "today")
-replace question_type = 6 if inlist(type, "start", "end", "submissiondate")
-replace question_type= 7 if type == "geopoint"
-replace question_type = -111 if inlist(type, "begin_group", "end_group", ///
-	"begin_repeat", "end_repeat")
-replace question_type=-222 if note==1
-replace question_type = -333 if type == "text audit"
-replace question_type=-555 if missing(question_type)
-
-drop numeric_calculate
-
-/* 
-The above tries to assign a question type to every row of the instrument. 
-If the question type is negative (see value label) the dofile will just skip 
-that variable. In the majority of cases this should be benign, and you'll know
-pretty quickly if a variable needs attention.
-*/
-
-*===============================================================================
-* 	Repeat Groups
-*===============================================================================
-
-/* 
-These next few loops tell us which groups each question belongs to. This helps
- us tell if a question exists within a loop, or a specific block of questions 
- with an enablement condition, etc.
-*/
-
-tempname commands repeat_group_long
-frame create `commands'
-frame `commands': insobs 1
-
-count if type == "begin_repeat"
-local repeat_groups = `r(N)'
-
-if `repeat_groups' > 0 {
-
-	foreach jump in begin end { // identify the begin and end repeat sections
-
-		levelsof order if type=="`jump'_repeat", local(`jump') separate( ) // the rows where those sections are in the instrument
-		tokenize "``jump''", parse( ) // create numbered macros containing where those rows are
-		forvalues num = 1/`repeat_groups' {
-			local `jump'_`num' ``num'' // this will be useful in the next loop
-		}
-		
-	}
-
-	forvalues i = 1/`repeat_groups' {
-		local taken_`i' = 0 // this local will indicate whether an "end_repeat" has already been assigned to a specific repeat group
-	}
-
-	local counter = 0
-	forvalues i = `repeat_groups'(-1)1 { // for each begin_repeat
-
-		local ++counter
-		
-		// short for "current group"
-		local cg = (`repeat_groups' + 1) - `counter'
-
-		forvalues j = `repeat_groups'(-1)1 { // for each end_repeat 
-		
-			local true = (`end_`j'' > `begin_`i'') & `taken_`j'' == 0 // evaluates to 1 if the end_repeat is after the begin_repeat and hasn't already been taken
-			if `true' {
-				local k = `j' // potential match. But we will try lower values of repeat blocks to check if there is another end_repeat that is closer
-			}
-			
-		}
-		
-		local taken_`k' = 1 // we have assigned this end_repeat
-		local e_`cg' = `end_`k''
-		
-	}
-
-	frame create `repeat_group_long' int group int start int end strL group_name ///
-		strL group_label strL group_condition int group_type int repetitions ///
-		strL function strL repeat_var int repeat_var_pos ///
-		int repeat_var_nested strL repeat_count
-
-	tempname grouplabels
-	forvalues i = 1/`repeat_groups' {	
-
-		frame post `repeat_group_long' (`i') (`begin_`i'') (`e_`i'') ///
-			("`=name[`begin_`i'']'") ("`=labelEnglishen[`begin_`i'']'") ///
-			("`=relevant[`begin_`i'']'") (2) (.) ///
-			("") ("") (.) ///
-			(.) ("`=repeat_count[`begin_`i'']'")
-		
-		label define `grouplabels' `i' "`=labelEnglishen[`begin_`i'']'", modify
-		local gname_`i' = labelEnglishen[`begin_`i'']
-		
-		frame `commands': gen dataset_`i' = "local shape_`i' "
-
-	}
-
-	frame `repeat_group_long' {
-		
-		replace function = ustrregexs(1) ///
-			if ustrregexm(repeat_count, "^(.*)#\{")
-		
-		replace repeat_var = ustrregexs(1) ///
-			if ustrregexm(repeat_count, "#\{(.*)\}")
-			
-		levelsof group if !missing(repeat_var), clean local(repvar_groups)
-		foreach g in `repvar_groups' {
-			
-			local r = repeat_var[`g']
-			frame `qs': levelsof order if name == "`r'", clean local(rownum)
-			replace repeat_var_pos = `rownum' in `g'
-			
-		}
-		
-	}
-
-	tempname expanded_repeats expanded_repeats_2
-	frame copy `repeat_group_long' `expanded_repeats'
-	frame `expanded_repeats' {
-		
-		gen diff = end - start
-		expand diff + 1
-		sort group
-		bysort group: gen order = start[1] + _n - 1
-		drop if inlist(order, end, start)
-		
-		frame copy `expanded_repeats' `expanded_repeats_2'
-		
-		replace repeat_var_pos = order
-		keep repeat_var_pos group 
-		bysort repeat_var_pos (group): gen dum = _n
-		reshape wide group, i(repeat_var_pos) j(dum)
-		
-		findregex, re("^group\d+$")
-		local groupvars `s(varlist)'
-		
-	}
-
-	cwf `repeat_group_long'
-		
-	frlink m:1 repeat_var_pos, frame(`expanded_repeats')
-	frget `groupvars', from(`expanded_repeats')
-	replace repeat_var_nested = !missing(`expanded_repeats')
-	drop `expanded_repeats'
-	
-	clonevar repeat_group_name = group_name
-	clonevar repeat_group_label = group_label
-	clonevar lowest_level = group
-
-	egen nested_levels = anycount(`groupvars'), values(1)
-	sort group
-	forvalues g = 1/`c(N)' {
-		
-		local start = start[`g']
-		local end = end[`g']
-		
-		frame `qs' {
-			
-			tempvar ingroup
-			gen `ingroup' = inrange(order, `start', `end') & inlist(question_type, 1, 2, 4, 5, 6)
-			sum order if `ingroup'
-			local repeat_var = name[`r(min)']
-			
-		}
-			
-		frame `rawdata' {
-				
-			findregex, re("^`repeat_var'[\d_]+") sensitive
-			local nested_varlist `s(varlist)'
-			local max_num = 0
-			foreach var in `nested_varlist' {
-				
-				local num = real(ustrregexra("`var'", ".*_(\d+)$", "$1"))
-				if (`num' > `max_num') local max_num = `num'
-				
-			}
-			
-		}
-		
-		replace repetitions = `max_num' in `g'
-		
-	}
-
-	frame `expanded_repeats_2' {
-
-		forvalues i = 1/`repeat_groups' {
-			
-			gen repeat_group_`i' = 1 if group == `i'
-			local rvars `rvars' repeat_group_`i'
-			
-		}
-		collapse (max) `rvars' lowest_level = group, by(order)
-		
-	}
-
-	cwf `qs'
-	frlink 1:1 order, frame(`expanded_repeats_2')
-	frget `rvars' lowest_level, from(`expanded_repeats_2')
-	gen repeated = !missing(`expanded_repeats_2')
-	replace lowest_level = 0 if missing(lowest_level)
-	drop `expanded_repeats_2'
-
-}
-else {
-	
-	gen repeated = 0
-	gen lowest_level = 0
-	
-}
-
-*------------------------------------------------------------------
-*	General Question Blocks
-*------------------------------------------------------------------
-
-tempname general_groups
-frame create `general_groups' int group int start int end strL group_name ///
-	strL group_label strL group_condition
-
-foreach jump in begin end {
-	count if type=="`jump'_group"
-	local q_groups = `r(N)'
-	levelsof order if type=="`jump'_group", local(`jump') separate( )
-	tokenize "``jump''", parse( )
-	forvalues num = `q_groups'(-1)1{
-		local `jump'_`num' ``num''
-	}
-}
-
-gen group = .
-gen conditions = relevant // survey logic for the question
-
-if `q_groups' > 0 {
-
-/* 
-Now, we're working on defining the enablement conditions for each question.
-This takes into account the conditions for the individual question as well as 
-those for the question block the question is in.
-*/
-
-tempname grouplabels
-forvalues i = 1/`q_groups' {
-	
-	frame post `general_groups' (`i') (`begin_`i'') (`end_`i'') ///
-		("`=name[`begin_`i'']'") ("`=labelEnglishen[`begin_`i'']'") ///
-		("`=conditions[`begin_`i'']'")
-		
-	label define `grouplabels' `i' "`=labelEnglishen[`begin_`i'']'", modify
-	local gname_`i' = labelEnglishen[`begin_`i'']
-
-}
-
-tempname groups_long
-frame copy `general_groups' `groups_long'
-frame `groups_long' {
-	
-	gen diff = end - start
-	expand diff + 1
-	sort group
-	bysort group: gen order = start[1] + _n - 1
-	keep order group group_condition
-	bysort order (group): gen dum = _n
-	reshape wide group group_condition, i(order) j(dum)
-	findregex, re("^group\d+$")
-	local gvars `s(varlist)'
-	egen total_groups = rowtotal(`gvars')
-	egen lowest_group = rowmax(`gvars')
-	findregex, re("^group_condition\d+$")
-	local convars `s(varlist)'
-	local getvars `gvars' `convars'
-	
-}
-
-frlink 1:1 order, frame(`groups_long')
-frget total_groups lowest_group `getvars', from(`groups_long')
-drop `groups_long'
-label values `gvars' `grouplabels'
-forvalues i = 1/`q_groups' {
-	
-	egen group_`i' = anymatch(`gvars'), values(`i')
-	label variable group_`i' "question in group `i'"
-	
-}
-
-}
-
-egen unlock = concat(conditions `convars'), punct("; ")
-replace unlock = strtrim(stritrim(unlock))
-replace unlock = ustrregexra(unlock, "(; ; )+", "; ")
-replace unlock = ustrregexra(unlock, "^; |^ ; ", "")
-replace unlock = ustrregexra(unlock, "; $| ;$", "")
-replace unlock = ustrregexra(unlock, "(; ){2,}", ";")
-replace unlock = ustrregexra(unlock, "(;){2,}", ";")
-replace unlock = ustrregexra(unlock, "^(; )+", "")
-replace unlock = ustrregexra(unlock, "(; )+$", "")
-replace unlock = "" if unlock == ";"
-replace unlock = ustrregexra(unlock, ";+$", "")
-replace unlock = ustrregexra(unlock, "; +$", "")
-
-clonevar order_1 = order
-sort order 
-drop if question_type < 0 | missing(name)
-replace order = _n
-
-*===============================================================================
 * 	Variables
 *===============================================================================
 
+cwf `qs'
 compress
+drop if question_type < 0
 sort order
+
+// generate some helpful macros
 local brek = char(10)
 local tab = char(9)
 foreach thing in brek tab {
@@ -636,19 +525,15 @@ foreach thing in brek tab {
 	}
 	
 }
+
 local hbanner = "*" + ("=")* 65
 local lbanner = "*" + ("-") * 65
 
-if `repeat_groups' > 0 {
+if `n_repeats' > 0 {
 	
-	egen number_repeat_groups = rowtotal(`rvars')
-	sort order
-	frame `repeat_group_long': sort group
-	forvalues j = 1/`repeat_groups' {
-		
-		frame `repeat_group_long': local repeats_`j' = repetitions[`j']
-		
-	}
+	frlink m:1 repeat_group, frame(`repeat_groups' index)
+	frget repetitions within layers_nested `nest_vars' ///
+		, from(`repeat_groups')
 	
 }
 
@@ -661,14 +546,14 @@ if "`rename'" != "" {
 	
 }
 
-tempname long_qs
-frame copy `qs' `long_qs'
-
+// expand multiple_selects
+gen n = _n 
 levelsof order if question_type == 3, clean local(mult_selects)
 foreach i in `mult_selects' {
 	
-	local name = desired_varname[`i']
-	local vallabel = type2[`i']
+	levelsof n if order == `i', clean local(j)
+	local name = desired_varname[`j']
+	local vallabel = type2[`j']
 	
 	frame `choices' {
 		
@@ -678,127 +563,116 @@ foreach i in `mult_selects' {
 		local expansion = `levels' + 1
 		
 	}
+		
+	expand `expansion' if order == `i'
+	bysort order (within_order): replace within_order = _n if order == `i'
+
+	local s = 1
+	foreach row in `options' {
+		
+		local ++s
+		frame `choices': local value = name[`row']
+		frame `choices': local lab = label[`row']
+		frame `qs': local labstat = labelStata[`j']
+		
+		replace desired_varname = desired_varname + "_" + "`value'" if order == `i' & within_order == `s'
+		replace name = name + "_" + "`value'" if order == `i' & within_order == `s'
+		replace labelStata = "#{`name'}: `lab'" if order == `i' & within_order == `s'
 	
-	frame `long_qs' {
-		
-		expand `expansion' if order == `i'
-		bysort order (within_order): replace within_order = _n if order == `i'
-	
-		local s = 1
-		foreach row in `options' {
-			
-			local ++s
-			frame `choices': local value = name[`row']
-			frame `choices': local lab = label[`row']
-			frame `qs': local labstat = labelStata[`i']
-			
-			replace desired_varname = desired_varname + "_" + "`value'" if order == `i' & within_order == `s'
-			replace name = name + "_" + "`value'" if order == `i' & within_order == `s'
-			replace labelStata = "#{`name'}: `lab'" if order == `i' & within_order == `s'
-		
-		}
-		
 	}
+	
+	sort order within_order
+	replace n = _n
 	
 }
 
+// expand GPS
 levelsof order if question_type == 7, clean local(gps)
 foreach i in `gps' {
-	
-	frame `long_qs' { 
 		
-		expand 4 if order == `i'
-		bysort order (within_order): replace within_order = _n if order == `i'
-		
-		local s = 0
-		foreach f in Accuracy Latitude Longitude Altitude {
-			
-			local ++s
-			replace desired_varname = desired_varname + "`f'" if within_order == `s' & order == `i'
-			replace name = name + "`f'" if within_order == `s' & order == `i'
-			replace labelStata = labelStata + ": `f'" if within_order == `s' & order == `i'
-			
-		}
+	expand 4 if order == `i'
+	bysort order (within_order): replace within_order = _n if order == `i'
 	
+	local s = 0
+	foreach f in Accuracy Latitude Longitude Altitude {
+		
+		local ++s
+		replace desired_varname = desired_varname + "`f'" if within_order == `s' & order == `i'
+		replace name = name + "`f'" if within_order == `s' & order == `i'
+		replace labelStata = labelStata + ": `f'" if within_order == `s' & order == `i'
+		
 	}
 	
 }
 
-cwf `long_qs'
 assert !missing(desired_varname)
 
 // solving problem of duplicate names...
 bysort desired_varname (order): keep if _n == 1
-
 sort order within_order 
-gen new_order = _n
+replace n = _n 
 
-// storing list of previous varnames
-clonevar vlist = name
-clonevar vlist2 = desired_varname
+// how this variable appears in the raw data 
+gen vlist = name
 
-// actual varlist in raw data
-clonevar varlist = name
-clonevar varlist2 = desired_varname
+// how this variable will appear in final data
+gen desired_vlist = desired_varname
 
-clonevar shapelist = desired_varname
-clonevar shapelist_lag = desired_varname
+// the reshaping varlist
+gen shape_vlist = ""
 
-replace varlist = "" if repeated == 1
-replace varlist2 = "" if repeated == 1
-if `repeat_groups' > 0 {
+if `n_repeats' > 0 {
 	
-	forvalues r = 1/`repeat_groups' {
+	frame `repeat_groups' {
 		
-		if `repeats_`r'' == 0 continue
-		
-		replace shapelist = ustrregexra(shapelist_lag, "(\b\w+\b)", "$1_ ") ///
-				if repeat_group_`r' == 1
-		
-		forvalues i = 1/`repeats_`r'' {
+		sort index 
+		forvalues r = 1/`c(N)' {
 			
-			replace varlist = varlist + " " + ustrregexra(vlist, "(\b\w+\b)", "$1_`i' ") ///
-				if repeat_group_`r' == 1
+			local layers_nested = layers_nested[`r']
+			
+			forvalues l = `layers_nested'(-1)0 {
 				
-			replace varlist = strtrim(stritrim(varlist))
+				frame `qs' { 
 				
-			replace varlist2 = varlist2 + " " + ustrregexra(vlist2, "(\b\w+\b)", "$1_`i' ") ///
-				if repeat_group_`r' == 1
+					tempvar previous_vlist 
+					clonevar `previous_vlist' = vlist
+					
+					tempvar previous_desired_vlist 
+					clonevar `previous_desired_vlist' = desired_vlist
+					
+					replace shape_vlist = ///
+						ustrregexra(`previous_desired_vlist', "(\w+)", "$1_") ///
+						if repeat_group == `r'
+					
+					replace vlist = "" if repeat_group == `r'
+					replace desired_vlist = "" if repeat_group == `r'
+					
+				}
 				
-			replace varlist2 = strtrim(stritrim(varlist2))
+				if `l' == 0 local repvar repetitions 
+				else local repvar nest_repeats_`l'
+				local layer_repeats = `repvar'[`r']
+				
+				forvalues c = 1/`layer_repeats' {
+					
+					frame `qs' { 
+						
+						replace vlist = vlist + " " + ustrregexra(`previous_vlist', "(\b\w+\b)", "$1_`c' ") if repeat_group == `r'
+						replace desired_vlist = desired_vlist + " " + ustrregexra(`previous_desired_vlist', "(\b\w+\b)", "$1_`c' ") if repeat_group == `r'
+						
+					}
+					
+				}
+				
+			}
 			
 		}
 		
-		tempname storage
-		frame copy `long_qs' `storage' 
-		frame `storage' {
-			
-			keep if lowest_level == `r'
-			keep shapelist new_order 
-			gen group = 1
-			reshape wide shapelist, i(group) j(new_order)
-			unab lvars : shapelist*
-			egen macro_1 = concat(`lvars'), punct(" ")
-			local shapelist = macro_1[1]
-			// remove anything longer than 32 characters
-			local shapelist = ustrregexra("`shapelist'", "([a-zA-Z][a-zA-Z0-9_]{31,})", "", .)
-			
-		}
-
-		frame `commands': replace dataset_`r' = dataset_`r' + stritrim("`shapelist'")
-		
-		replace vlist = varlist if repeat_group_`r' == 1
-		replace vlist2 = varlist2 if repeat_group_`r' == 1
-		replace shapelist_lag = vlist2 if repeat_group_`r' == 1
-		
-		replace varlist = ""
-		replace varlist2 = ""
-
-	} 
-
-	drop varlist shapelist
+	}
 	
 }
+
+drop if repetitions == 0
 
 gen num_vars = wordcount(vlist)
 gen var_stub = cond(num_vars == 1, vlist, "\`var'")
@@ -830,14 +704,12 @@ replace format_command = "tempvar date`brek'cap clonevar \`date' = " + var_stub 
 	`" if !missing(\`date')"' + ///
 	+ `"`brek'cap format "' + var_stub + `" %tc"' ///
 	if question_type == 6
-	
-assert !missing(format_command)
 
 gen values_command = "cap label values " + var_stub + " " + type2 if !missing(type2) ///
 	& !inlist(question_type, 3, 7)
 
 gen notes_command = "cap notes " + var_stub + ": " + labelEnglishen + ///
-	"`brek'cap notes " + var_stub + ": relevance conditions: " + unlock
+	"`brek'cap notes " + var_stub + ": relevance conditions: " + relevant
 	
 gen command = "`hbanner'`brek'*`tab2'" + name + "`brek'`hbanner'`brek2'" 
 replace command = command + "cap foreach var of varlist " + vlist + ///
@@ -848,8 +720,8 @@ replace command = command + label_command + "`brek'" + format_command + ///
 if "`rename'" != "" {
 	
 	gen rename_command = `"`brek'cap rename "' + var_stub + `" \`=ustrregexrf(""' + ///
-		var_stub + `"", "^"' + original_name + `"", ""' + new_name + `"")'"' ///
-		if !missing(new_name)
+		var_stub + `"", "^"' + name + `"", ""' + desired_varname + `"")'"' ///
+		if !missing(new_name) & new_name != name
 	
 	replace command = command + rename_command
 	
@@ -857,10 +729,15 @@ if "`rename'" != "" {
 
 replace command = command + "`brek2'}" if num_vars > 1
 
-forvalues i = 0(1)`repeat_groups' {
+forvalues i = 0(1)`n_repeats' {
 	
-	levelsof desired_varname if lowest_level == `i', clean local(vlist_`i')
-	frame `commands': gen varlist_`i' = "local varlist_`i' `vlist_`i''"
+	valuesof desired_varname if repeat_group == `i'
+	local varlist_`i' `r(values)'
+	local varlist_`i' : list varlist_`i' - deidvars
+	
+	if `i' == 0 continue
+	valuesof shape_vlist if repeat_group == `i'
+	local shapelist_`i' `r(values)'
 	
 }
 
@@ -871,42 +748,27 @@ forvalues i = 0(1)`repeat_groups' {
 if "`savefolder'" != "" cap mkdir "`savefolder'"
 
 tempname codebook
-frame copy `long_qs' `codebook'
+frame copy `qs' `codebook'
 cwf `codebook'
-findregex, re("^(repetitions_|function_)\d+")
-drop `s(varlist)' name num_vars  label_command format_command ///
-	values_command notes_command command var_stub shapelist_lag vlist ///
-	calculation order note
+
+drop order __* vlist desired_vlist shape_vlist label_command format_command ///
+	values_command notes_command var_stub num_vars string_force numeric_force ///
+	note repeat_count type name numeric_calculate
 	
-if `repeat_groups' > 0 {
-	
-	frlink m:1 lowest_level, frame(`repeat_group_long')
-	frget repeat_group_name repeat_group_label, from(`repeat_group_long')
-	drop `repeat_group_long'
-	label variable repeat_group_name "name of repeat group this question belongs to"
-	label variable repeat_group_label "label of repeat group this question belongs to"
-	
-	local rp_vars repeat_group_name repeat_group_label
-	
-}
-else {
-	
-	gen repeat_group_name = "survey"
-	gen repeat_group_label = "Survey-level"
-	
-}
+label define repeat_label `repeat_label'
+label define group_label `group_label'
+
+label values repeat_group within repeat_label
+label values group group_label
 	
 rename desired_varname name
 rename labelStata varlabel
 rename labelEnglishen full_question
 rename type1 original_type
 rename type2 vallabel
-rename order_1 instrument_position
-rename new_order order
-rename lowest_level repeat_group
+rename n order
 
-replace repeat_group_name = "survey" if repeat_group == 0
-replace repeat_group_label = "Survey-level" if repeat_group == 0
+order order name varlabel 
 
 label variable order "order of appearance in instrument"
 label variable within_order "order of appearance for variables generated by single line"
@@ -916,19 +778,17 @@ label variable varlabel "variable label"
 label variable vallabel "value label"
 label variable full_question "full question text in instrument"
 label variable repeat_group "lowest-level repeat group to which question belongs"
-label variable conditions "full set of relevancy conditions for this question"
-
-cap unab extra_vars : group_* repeat_group_*
-
-order order within_order name question_type preloaded varlabel vallabel full_question ///
-	conditions repeated repeat_group `rp_vars' ///
-	`extra_vars'
-	
-cap drop __*
+label variable group "lowest-level group to which question belongs"
+label variable relevant "full set of relevancy conditions for this question"
+label variable original_type "variable type, as specified in instrument"
+label variable preloaded "preloaded variable"
+label variable repetitions "number of repeats for repeat group this variable was in"
+label variable within "repeat group this repeated variable is nested inside"
+label variable command "import dofile command for this variable"
 
 if "`savefolder'" != "" save "`savefolder'/survey_metadata.dta", replace
 
-cwf `long_qs'
+cwf `qs'
 
 // Now we're about to write the instructions to a dofile. Buckle up
 cap file close myfile
@@ -1018,7 +878,7 @@ if "`mv'" != "" file write myfile ///
 		
 if `want_reshape' == 1 {
 	
-	cap assert `repeat_groups' > 0
+	cap assert `n_repeats' > 0
 	if _rc {
 		
 		display as error "No repeat groups in survey" 
@@ -1028,52 +888,38 @@ if `want_reshape' == 1 {
 	
 	display regexm("`instname'", "[^\\/]+$")
 	local file_short = regexs(0)
+		
+	cap file close myfile2
+	file open myfile2 using "`reshapefile'", write text replace
+	file write myfile2 ///
+		"/*" ///
+		_n "Title: Reshape Dofile for `file_short'" ///
+		_n "Date Created: `c(current_date)'" ///
+		_n "Author: `c(username)'" ///
+		_n "Note: " ///
+		_n "*/" _n(3) ///
+		"`hbanner'" ///
+		_n "* 	Handy Macros" _n /// 
+		"`hbanner'" ///
+		_n(2) ///
+		"`lbanner'" _n ///
+		"*	Reshapable Variables" _n ///
+		"`lbanner'" _n(2)
 	
-	frame `repeat_group_long' {
-		
-		levelsof group if missing(group1) & repetitions > 0, clean local(standalone)
-		levelsof group if !missing(group1) & repetitions > 0, clean local(nesteds)
-		
-		cap file close myfile2
-		file open myfile2 using "`reshapefile'", write text replace
-		file write myfile2 ///
-			"/*" ///
-			_n "Title: Reshape Dofile for `file_short'" ///
-			_n "Date Created: `c(current_date)'" ///
-			_n "Author: `c(username)'" ///
-			_n "Note: " ///
-			_n "*/" _n(3) ///
-			"`hbanner'" ///
-			_n "* 	Handy Macros" _n /// 
-			"`hbanner'" ///
-			_n(2) ///
-			"`lbanner'" _n ///
-			"*	Reshapable Variables" _n ///
-			"`lbanner'" _n(2)
+	file write myfile2 "local varlist_0 `varlist_0'" _n(2)
 			
-	}
-	
-	frame `commands': file write myfile2 (varlist_0) _n(2)
+	forvalues i = 1/`n_repeats' {
 			
-	forvalues i = 1/`repeat_groups' {
-		
-		frame `commands' { 
+		if repetitions[`i'] != 0 {
 			
-			file write myfile2 (dataset_`i') _n(2)
-			file write myfile2 (varlist_`i') _n(2)
-		
-		}
-		
-		frame `repeat_group_long' {
+			file write myfile2 "local shape_`i' `shapelist_`i''" _n(2)
+			file write myfile2 "local varlist_`i' `varlist_`i''" _n(2)
 			
-			local desc_`i' = group_label[`i']
-			local name_`i' = group_name[`i']
-		
 		}
 		
 	}
 	
-	frame `repeat_group_long' {
+	frame `repeat_groups' {
 		
 		file write myfile2 ///
 		"`hbanner'" ///
@@ -1082,216 +928,169 @@ if `want_reshape' == 1 {
 		_n(2) "frame rename default survey" _n ///
 		`"label data "Survey-level data from `file_short'""' _n(2) ///
 		`"local frgetvars `frgetvars'"'
+		
 		if "`deidvars'" != "" {
 			file write myfile2 _n `"local deidvars `deidvars'"'
 		}
-	
-		foreach g in `standalone' {
-			
-			file write myfile2 ///
-				_n(2) ///
-				"`lbanner'" _n ///
-				"*	Reshape to level of '`desc_`g'''" _n ///
-				"`lbanner'" _n(2) ///
-				"local group_name `name_`g''" _n(2) ///
-				`"preserve"' _n(2) ///
-				`"local regex_stubs = ustrregexra(strtrim(stritrim("\`shape_`g''")), " ", "|", .)"' _n ///
-				`"local regex_pattern "^((\`regex_stubs')\d+)$""' _n ///
-				`"quietly findregex, re("\`regex_pattern'") sensitive"' _n ///
-				`"local reshaped_vars \`s(varlist)'"' _n ///
-				`"keep \`reshaped_vars' *key"' _n(2) ///
-				"foreach var in \`shape_`g'' {" _n ///
-				_tab "cap local X_\`var' : variable label \`var'1" _n ///
-				_tab "cap local L_\`var': value label \`var'1" _n /// 
-				"}" _n(2) ///
-				"reshape long \`shape_`g'', i(key) j(\`group_name'_key)" _n(2) ///
-				"foreach var of varlist \`shape_`g'' {" _n ///
-				_tab `"label variable \`var' "\`X_\`var''""' _n ///
-				_tab `"cap label values \`var' \`L_\`var''"' _n /// 
-				"}" _n(2) ///
-				"frame put \`shape_`g'' `identifying_vars' \`group_name'_key, into(\`group_name')" _n ///
-				`"restore"' _n `"drop \`reshaped_vars'"' _n(2) ///
-				"cwf \`group_name'" _n "missings dropobs \`shape_`g'', force sysmiss" _n ///
-				`"renvars *_, postsub("_" "")"' _n ///
-				"frlink m:1 key, frame(survey)" _n ///
-				`"if "\`frgetvars'" != "" {"' _n(2) ///
-				_tab `"local toget"' _n ///
-				_tab `"foreach var in \`frgetvars' {"' _n(2) ///
-				_tab _tab `"frame \`c(frame)': cap confirm variable \`var'"' _n ///
-				_tab _tab `"if !_rc continue"' _n(2) ///
-				_tab _tab `"frame survey: cap confirm variable \`var'"' _n ///
-				_tab _tab `"if !_rc local toget \`toget' \`var'"' _n(2) ///
-				_tab `"}"' _n(2) ///
-				_tab `"if "\`toget'" != "" frget \`toget', from(survey)"' _n(2) ///
-				"}" _n(2) ///
-				"isid key \`group_name'_key" _n ///
-				`"local added_vars \`toget'"' _n ///
-				`"keep \`varlist_`g'' \`added_vars' *key"' _n ///
-				`"if "\`added_vars'" != "" order \`added_vars'"' _n ///
-				`"label data "`desc_`g''-level data from `file_short'""' _n
-				
-			if "`deidvars'" != "" {
-			
-				file write myfile2 _n ///
-				`"ds"' _n ///
-				`"local currvars \`r(varlist)'"' _n ///
-				`"local vars_to_drop : list deidvars & currvars"' _n ///
-				`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
-				
-			}
-				
-			if "`savefolder'" != "" {
-				
-				file write myfile2 ///
-					`"compress"' _n ///
-					`"save "`macval(savefolder)'/\`group_name'.dta", replace"' _n
-				
-			}
 
-			file write myfile2 _n `"cwf survey"' _n
+		forvalues i = 1/`n_repeats' {
+			
+			if `=repetitions[`i']' == 0 continue
+			
+			local all_keys key 
+			local within 
+			local layers_nested = layers_nested[`i']
+			local target_desc = label[`i']
+			local target_name = name[`i']
+			local counter = 0
+			local lab_regex = (`layers_nested' * "_[0-9]+") + "_"
+			local previous_frames
+			
+			forvalues k = `layers_nested'(-1)0 {
+				
+				local ++counter
+				
+				if `k' == `layers_nested' {
+						
+					local prev_desc "Survey-Level"
+					local prev_name survey
+					local prev_key "key"
+					local regex `""(_)\b", "_@""'
 					
-			
-		}
-		
-		foreach g in `nesteds' {
-	
-// 			if `r(r)' >= 3 {
-//				
-// 				continue
-//				
-// 			}
-// 			else if `r(r)' == 2 {
-//				
-// 				continue
-//				
-// 			}
-// 			else if `r(r)' == 1 {
-				
-			local w = group1[`g']
-			local row = start[`g']
-			
-			file write myfile2 ///
-				_n(2) ///
-				"`lbanner'" _n ///
-				"*	Reshape to level of '`desc_`g''' from within '`desc_`w'''" _n ///
-				"`lbanner'" _n(2) ///
-				"local group_name `name_`g''" _n ///
-				"local prev_group_name `name_`w''" _n ///
-				"local all_invars" _n(2) ///
-				`"preserve"' _n(2) ///
-				`"local regex_stubs = ustrregexra(strtrim(stritrim("\`shape_`g''")), " ", "|", .)"' _n ///
-				`"local regex_pattern "^((\`regex_stubs')\d+)$""' _n ///
-				`"quietly findregex, re("\`regex_pattern'") sensitive"' _n ///
-				`"local reshaped_vars \`s(varlist)'"' _n ///
-				`"keep \`reshaped_vars' *key"' _n(2) ///
-				"foreach var in \`shape_`g'' {" _n ///
-				_tab "cap local X_\`var' : variable label \`var'1" _n "}" _n(2) ///
-				"reshape long \`shape_`g'', i(key) j(\`group_name'_key)" _n(2) ///
-				"foreach var of varlist \`shape_`g'' {" _n ///
-				_tab `"cap label variable \`var' "\`X_\`var''""' _n "}" _n(2) ///
-				"frame put \`shape_`g'' `identifying_vars' \`group_name'_key, into(\`group_name')" _n ///
-				`"restore"' _n ///
-				"drop \`reshaped_vars'" _n(2) ///
-				"cwf \`group_name'" _n(2) ///
-				"// reformat the reshape variables so that they can be reshaped long once more" _n ///
-				`"local all_invars = ustrregexra("\`shape_`g''", "(\d+_)\b", "")"' _n ///
-				`"local all_invars : list uniq all_invars"' _n ///
-				`"local reshapevars = ustrregexra("\`all_invars'", " ", "@_ ")"' _n(2) ///
-				"// find value labels" _n ///
-				"foreach var in \`all_invars' {" _n ///
-				_tab "cap local X_\`var' : variable label \`var'1_" _n ///
-				_tab "cap local L_\`var': value label \`var'1" _n ///
-				"}" _n(2) ///
-				"// an id for each element being reshaped" _n ///
-				"bysort key: gen reshape_id = _n" _n(2) ///
-				"// reshape to long again" _n ///
-				"reshape long \`reshapevars', i(reshape_id key) j(\`prev_group_name'_key)" _n(2) ///
-				"// get rid of the spare underscore" _n ///
-				`"renvars *__, postsub("_" "")"' _n(2) ///
-				"// label the variables" _n ///
-				"foreach var of varlist \`all_invars' {" _n ///
-				_tab `"cap label variable \`var' "\`X_\`var''""' _n ///
-				_tab `"cap label values \`var' \`L_\`var''"' _n ///
-				"}" _n(2) ///
-				"// if it's missing this, then it shouldn't be in the dataset" _n ///
-				`"missings dropobs \`all_invars', force sysmiss"' _n(2) ///
-				"// get rid of the spare underscore again" _n ///
-				`"renvars *_, postsub("_" "")"' _n(2) ///
-				`"frlink m:1 key, frame(survey)"' _n ///
-				`"frlink m:1 `name_`w''_key key, frame(`name_`w'')"' _n ///
-				`"if "\`frgetvars'" != "" {"' _n(2) ///
-				_tab `"local added_vars"' _n ///
-				_tab `"foreach frame in survey `name_`w'' {"' _n(2) ///
-				_tab _tab `"local toget"' _n ///
-				_tab _tab `"foreach var in \`frgetvars' {"' _n(2) ///
-				_tab _tab _tab `"frame \`c(frame)': cap confirm variable \`var'"' _n ///
-				_tab _tab _tab `"if !_rc continue"' _n(2) ///
-				_tab _tab _tab `"frame \`frame': cap confirm variable \`var'"' _n ///
-				_tab _tab _tab `"if !_rc local toget \`toget' \`var'"' _n(2) ///
-				_tab _tab `"}"' _n(2) ///
-				_tab _tab `"local added_vars \`added_vars' \`toget'"' _n ///
-				_tab _tab `"if "\`toget'" != "" frget \`toget', from(\`frame')"' _n ///
-				_tab _tab `"drop \`frame'"' _n(2) ///
-				_tab `"}"' _n(2) ///
-				"}" _n(2) ///
-				"// check ids are intact" _n ///
-				"isid key `name_`g''_key `name_`w''_key" _n(2) ///
-				"keep \`varlist_`g'' \`added_vars' *key" _n ///
-				`"if "\`added_vars'" != "" order \`added_vars'"' _n ///
-				`"label data "`desc_`g''-level data by `desc_`w'' from `file_short'""' _n
+					file write myfile2 ///
+						_n(2) ///
+						"`hbanner'" _n ///
+						"*	Reshape to level of '`target_desc''" _n ///
+						"`hbanner'" _n(2) ///
+						`"local reshape_vars \`shape_`i''"' _n ///
+						"foreach var in \`reshape_vars' {" _n ///
+						_tab `"local stub_var = ustrregexra("\`var'", "(`lab_regex')\$", "")"' _n ///
+						_tab `"local stub_vars \`stub_var'"' _n ///
+						_tab "cap local X_\`stub_var' : variable label \`var'1" _n ///
+						_tab "cap local L_\`stub_var': value label \`var'1" _n /// 
+						"}" _n(2) ///
+						"local stub_vars : list uniq stub_vars"
+						
+				}
+				else {
 					
-// 			}
-			
-			if "`deidvars'" != "" {
+					local u = `k' + 1
+					local w = nest_level_`u'[`i']
+					local prev_desc = label[`w']
+					local prev_name = name[`w']
+					local prev_key `prev_name'_key
+					local regex `""_[0-9]+_@ ", "_@ ""'
 				
-				file write myfile2 _n ///
-				`"ds"' _n ///
-				`"local currvars \`r(varlist)'"' _n ///
-				`"local vars_to_drop : list deidvars & currvars"' _n ///
-				`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
+				}
 				
-			}
-			
-			if "`savefolder'" != "" {
+				if `k' == 0 {
+						
+						local to `i'
+						
+				}
+				else {
+					
+					local to nest_level_`k'[`i']
+					
+				}
+				
+				local to_desc = label[`to']
+				local to_name = name[`to']
+				local to_key `to_name'_key
+				local previous_frames `previous_frames' `prev_name'
 				
 				file write myfile2 ///
-					`"compress"' _n ///
-					`"save "`macval(savefolder)'/\`group_name'.dta", replace"' _n(2)
+					_n(2) ///
+					"`lbanner'" _n ///
+					"*	Reshape to level of '`to_desc'' from '`prev_desc''" _n ///
+					"`lbanner'" _n(2) ///
+					`"local reshape_vars = ustrregexra("\`reshape_vars'", `regex')"' _n ///
+					`"local reshape_vars : list uniq reshape_vars"' _n(2)
+					
+				if `k' == `layers_nested' {
+					
+					file write myfile2 ///
+						`"preserve"' _n(2) ///
+						`"local regex_stubs = ustrregexra(strtrim(stritrim("\`shape_`i''")), " ", "|", .)"' _n ///
+						`"local regex_pattern "^((\`regex_stubs')\d+)$""' _n ///
+						`"quietly findregex, re("\`regex_pattern'") sensitive"' _n ///
+						`"local reshaped_vars \`s(varlist)'"' _n ///
+						`"keep \`reshaped_vars' `all_keys'"' _n(2)
+					
+				}
 				
-			}
+				file write myfile2 ///
+					"reshape long \`reshape_vars', i(`all_keys') j(`to_key')" _n ///
+					`"renvars *_, postsub("_" "")"' _n
+					
+				local all_keys `all_keys' `to_key'
+				
+				if `k' == 0 {
+					
+					file write myfile2 ///
+						`"local reshape_vars = ustrregexra("\`reshape_vars'", "_@", "", .)"' _n ///
+						"frame put \`reshape_vars' `all_keys', into(`to_name')" _n ///
+						"cwf `to_name'" _n ///
+						"missings dropobs \`reshape_vars', force sysmiss" _n ///
+						"isid `all_keys'" _n(2) ///
+						`"foreach var of varlist \`varlist_`i'' {"' _n(2) ///
+						_tab `"cap label variable \`var' "\`X_\`var''""' _n ///
+						_tab `"cap label values \`var' "\`L_\`var''""' _n(2) ///
+						"}" _n(2) ///
+						"keep \`varlist_`i'' \`added_vars' `all_keys'" _n(2)
+						
+					if `layers_nested' > 0 {
+						
+						file write myfile2 ///
+							`"local j = 0"' _n ///
+							`"foreach frame in `previous_frames' {"' _n(2) ///
+							_tab `"local ++j"' _n ///
+							_tab `"if \`j' == 1 local keys key"' _n ///
+							_tab `"else local keys \`keys' \`frame'_key"' _n(2) ///
+							_tab `"if "\`frgetvars'" != "" {"' _n(2) ///
+							_tab _tab `"local toget"' _n ///
+							_tab _tab `"foreach var in \`frgetvars' {"' _n(2) ///
+							_tab _tab _tab `"cap confirm variable \`var'"' _n ///
+							_tab _tab _tab `"if !_rc continue"' _n(2) ///
+							_tab _tab _tab `"frame \`frame': cap confirm variable \`var'"' _n ///
+							_tab _tab _tab `"if !_rc local toget \`toget' \`var'"' _n(2) ///
+							_tab _tab "}" _n(2) ///
+							_tab _tab `"if "\`toget'" != "" {"' _n(2) ///
+							_tab _tab _tab `"frlink m:1 \`keys', frame(\`frame')"' _n ///
+							_tab _tab _tab `"frget \`toget', from(\`frame')"' _n ///
+							_tab _tab _tab `"drop \`frame'"' _n(2) ///
+							_tab _tab "}" _n(2) _tab "}" _n(2) "}" _n(2)
+						
+					}
+					
+					file write myfile2 "compress" _n ///
+						`"label data "`to_desc' data from `file_short'""' _n ///
+						`"save "`macval(savefolder)'/`to_name'.dta", replace"' _n(2) ///
+						"cwf survey" _n ///
+						`"restore"' _n ///
+						`"drop \`reshaped_vars'"'
 
-			file write myfile2 `"cwf survey"' _n(2)
-			
-		}
-		
-		file write myfile2 ///
-			`"keep \`varlist_0' key instanceID formdef_version"' _n
-		
-		if "`deidvars'" != "" {
-			
-			file write myfile2 _n ///
-			`"ds"' _n ///
-			`"local currvars \`r(varlist)'"' _n ///
-			`"local vars_to_drop : list deidvars & currvars"' _n ///
-			`"if "\`vars_to_drop'" != "" drop \`vars_to_drop'"' _n(2)
-			
-		}
-		
-		
-		if "`savefolder'" != "" {
+						
+				}
 				
-				file write myfile2 ///
-					`"compress"' _n ///
-					`"save "`macval(savefolder)'/survey.dta", replace"' _n
-				
+			}
+			
 		}
+		
+		file write myfile2 _n(2) ///
+			"`hbanner'" ///
+			_n "* 	Survey-Level" _n /// 
+			"`hbanner'" _n(2) ///
+			`"keep \`varlist_0'"' _n ///
+			"compress" _n ///
+			`"label data "survey-level data from `file_short'""' _n ///
+			`"save "`macval(savefolder)'/survey.dta", replace"'
 		
 		file close myfile2
 		
 	}
 	
 }
-	
 	
 file close myfile
 
