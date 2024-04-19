@@ -713,12 +713,17 @@ gen values_command = "cap label values " + var_stub + " " + type2 if !missing(ty
 
 gen notes_command = "cap notes " + var_stub + ": " + labelEnglishen + ///
 	"`brek'cap notes " + var_stub + ": relevance conditions: " + relevant
+
+gen char_command = "" 
+replace char_command = char_command + "cap char " + var_stub + "[qtext] " ///
+	+ labelEnglishen + "`brek'cap char " + var_stub + "[logic] " + relevant + ///
+	"`brek'cap char " + var_stub + "[preloaded] " + cond(preloaded == 1, "1", "0")
 	
 gen command = "`hbanner'`brek'*`tab2'" + name + "`brek'`hbanner'`brek2'" 
 replace command = command + "cap foreach var of varlist " + vlist + ///
 	"{`brek2'cap confirm variable " + var_stub + "`brek'if _rc continue`brek2'" if num_vars > 1
 replace command = command + label_command + "`brek'" + format_command + ///
-	"`brek'" + values_command + "`brek'" + notes_command
+	"`brek'" + values_command + "`brek'" + notes_command + "`brek'" + char_command
 	
 if "`rename'" != "" {
 	
