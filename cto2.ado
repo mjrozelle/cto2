@@ -1091,7 +1091,7 @@ if `want_reshape' == 1 {
 			"`hbanner'" ///
 			_n "* 	Survey-Level" _n /// 
 			"`hbanner'" _n(2) ///
-			`"keep \`varlist_0'"' _n ///
+			`"keep \`varlist_0' key submissiondate formdef_version"' _n ///
 			"compress" _n ///
 			`"label data "survey-level data from `file_short'""' _n ///
 			`"save "`macval(savefolder)'/survey.dta", replace"'
