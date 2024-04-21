@@ -1088,8 +1088,8 @@ if `want_reshape' == 1 {
 					
 					
 					file write myfile2 "compress" _n ///
-						`"label data "`to_desc' data from `file_short'""' _n ///
-						`"save "`macval(savefolder)'/`to_name'.dta", replace"' _n(2) ///
+						`"label data "`target_desc' data from `file_short'""' _n ///
+						`"save "`macval(savefolder)'/`target_name'.dta", replace"' _n(2) ///
 						"cwf survey" _n ///
 						`"drop \`reshaped_vars'"'
 
