@@ -1052,37 +1052,34 @@ if `want_reshape' == 1 {
 						_tab `"cap label variable \`var' "\`X_\`var''""' _n ///
 						_tab `"cap label values \`var' "\`L_\`var''""' _n(2) ///
 						"}" _n(2) ///
-						"keep \`varlist_`i'' \`added_vars' `all_keys'" _n(2)
+						"keep \`varlist_`i'' \`added_vars' `all_keys'" _n(2) ///
+						`"frame survey: restore"' _n(2)
 						
-					if `layers_nested' > 0 {
-						
-						file write myfile2 ///
-							`"local j = 0"' _n ///
-							`"foreach frame in `previous_frames' {"' _n(2) ///
-							_tab `"local ++j"' _n ///
-							_tab `"if \`j' == 1 local keys key"' _n ///
-							_tab `"else local keys \`keys' \`frame'_key"' _n(2) ///
-							_tab `"if "\`frgetvars'" != "" {"' _n(2) ///
-							_tab _tab `"local toget"' _n ///
-							_tab _tab `"foreach var in \`frgetvars' {"' _n(2) ///
-							_tab _tab _tab `"cap confirm variable \`var'"' _n ///
-							_tab _tab _tab `"if !_rc continue"' _n(2) ///
-							_tab _tab _tab `"frame \`frame': cap confirm variable \`var'"' _n ///
-							_tab _tab _tab `"if !_rc local toget \`toget' \`var'"' _n(2) ///
-							_tab _tab "}" _n(2) ///
-							_tab _tab `"if "\`toget'" != "" {"' _n(2) ///
-							_tab _tab _tab `"frlink m:1 \`keys', frame(\`frame')"' _n ///
-							_tab _tab _tab `"frget \`toget', from(\`frame')"' _n ///
-							_tab _tab _tab `"drop \`frame'"' _n(2) ///
-							_tab _tab "}" _n(2) _tab "}" _n(2) "}" _n(2)
-						
-					}
+					file write myfile2 ///
+						`"local j = 0"' _n ///
+						`"foreach frame in `previous_frames' {"' _n(2) ///
+						_tab `"local ++j"' _n ///
+						_tab `"if \`j' == 1 local keys key"' _n ///
+						_tab `"else local keys \`keys' \`frame'_key"' _n(2) ///
+						_tab `"if "\`frgetvars'" != "" {"' _n(2) ///
+						_tab _tab `"local toget"' _n ///
+						_tab _tab `"foreach var in \`frgetvars' {"' _n(2) ///
+						_tab _tab _tab `"cap confirm variable \`var'"' _n ///
+						_tab _tab _tab `"if !_rc continue"' _n(2) ///
+						_tab _tab _tab `"frame \`frame': cap confirm variable \`var'"' _n ///
+						_tab _tab _tab `"if !_rc local toget \`toget' \`var'"' _n(2) ///
+						_tab _tab "}" _n(2) ///
+						_tab _tab `"if "\`toget'" != "" {"' _n(2) ///
+						_tab _tab _tab `"frlink m:1 \`keys', frame(\`frame')"' _n ///
+						_tab _tab _tab `"frget \`toget', from(\`frame')"' _n ///
+						_tab _tab _tab `"drop \`frame'"' _n(2) ///
+						_tab _tab "}" _n(2) _tab "}" _n(2) "}" _n(2)
+					
 					
 					file write myfile2 "compress" _n ///
 						`"label data "`to_desc' data from `file_short'""' _n ///
 						`"save "`macval(savefolder)'/`to_name'.dta", replace"' _n(2) ///
 						"cwf survey" _n ///
-						`"restore"' _n ///
 						`"drop \`reshaped_vars'"'
 
 						
