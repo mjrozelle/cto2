@@ -957,7 +957,7 @@ if `want_reshape' == 1 {
 			local layers_nested = layers_nested[`i']
 			local target_desc = label[`i']
 			local target_name = name[`i']
-			local counter = 0
+			local counter = -1
 			local lab_regex = (`layers_nested' * "_[0-9]+") + "_"
 			local previous_frames
 			
@@ -989,23 +989,34 @@ if `want_reshape' == 1 {
 				}
 				else {
 					
-					local u = `k' + 1
-					local w = nest_level_`u'[`i']
-					local prev_desc = label[`w']
-					local prev_name = name[`w']
+					if `counter' == 1 {
+					
+						local prev_desc `target_desc'
+						local prev_name `target_name'
+					
+					}
+					else {
+						
+						local u = `k' + 1
+						local w = nest_level_`u'[`i']
+						local prev_desc = label[`w']
+						local prev_name = name[`w']
+						
+					}
+					
 					local prev_key `prev_name'_key
 					local regex `""_[0-9]+_@ ", "_@ ""'
 				
 				}
 				
-				if `k' == 0 {
+				if `counter' == 0 {
 						
-						local to `i'
+					local to `i'
 						
 				}
 				else {
 					
-					local to nest_level_`k'[`i']
+					local to nest_level_`counter'[`i']
 					
 				}
 				
@@ -1044,8 +1055,8 @@ if `want_reshape' == 1 {
 					
 					file write myfile2 ///
 						`"local reshape_vars = ustrregexra("\`reshape_vars'", "_@", "", .)"' _n ///
-						"frame put \`reshape_vars' `all_keys', into(`to_name')" _n ///
-						"cwf `to_name'" _n ///
+						"frame put \`reshape_vars' `all_keys', into(`target_name')" _n ///
+						"cwf `target_name'" _n ///
 						"missings dropobs \`reshape_vars', force sysmiss" _n ///
 						"isid `all_keys'" _n(2) ///
 						`"foreach var of varlist \`varlist_`i'' {"' _n(2) ///
