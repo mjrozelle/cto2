@@ -1012,18 +1012,22 @@ if `want_reshape' == 1 {
 				if `counter' == 0 {
 						
 					local to `i'
+					local previous_frames survey
 						
 				}
 				else {
 					
+					local p = `k' + 1
+					local prev_frame = name[`=nest_level_`p'[`i']']
 					local to nest_level_`counter'[`i']
+					local previous_frames `previous_frames' `prev_frame'
 					
 				}
 				
 				local to_desc = label[`to']
 				local to_name = name[`to']
 				local to_key `to_name'_key
-				local previous_frames `previous_frames' `prev_name'
+					
 				
 				file write myfile2 ///
 					_n(2) ///
