@@ -277,7 +277,7 @@ forvalues i = 1/`c(N)' {
 	if type[`i'] == "begin_group" { 
 		
 		local ++n_groups
-		local grouplist `grouplist' `n_groups'
+		local grouplist = strtrim(stritrim("`grouplist' `n_groups'"))
 		local group_label `group_label' `n_groups' "`=labelStata[`i']'"
 		
 		local type = question_type[`j']
@@ -297,7 +297,7 @@ forvalues i = 1/`c(N)' {
 	else if type[`i'] == "begin_repeat" {
 		
 		local ++n_repeats
-		local r_grouplist `r_grouplist' `n_repeats'
+		local r_grouplist = strtrim(stritrim("`r_grouplist' `n_repeats'"))
 		local repeat_label `repeat_label' `n_repeats' "`=labelStata[`i']'"
 		
 		local type = question_type[`j']
@@ -316,6 +316,7 @@ forvalues i = 1/`c(N)' {
 	
 	else if type[`i'] == "end_group" {
 		
+		local grouplist = strtrim(stritrim("`grouplist'"))
 		local grouplist = ///
 			substr("`grouplist'", 1, length("`grouplist'") ///
 			- strlen(word("`grouplist'", -1)))
@@ -324,6 +325,7 @@ forvalues i = 1/`c(N)' {
 	
 	else if type[`i'] == "end_repeat" {
 		
+		local r_grouplist = strtrim(stritrim("`r_grouplist'"))
 		local r_grouplist = ///
 			substr("`r_grouplist'", 1, length("`r_grouplist'") ///
 			- length(word("`r_grouplist'", -1)))
@@ -337,6 +339,7 @@ forvalues i = 1/`c(N)' {
 	replace repeat_group = `current_repeat' in `i'
 	
 }
+
 
 frame `groups' { 
 
