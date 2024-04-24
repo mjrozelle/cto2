@@ -1,5 +1,5 @@
-local dependencies findregex missings valuesof
-local aux findregex missings valuesof
+local dependencies findregex missings valuesof moremata
+local aux findregex missings valuesof mf_mm_diff.hlp
 
 foreach dependency in `dependencies' {
 	
