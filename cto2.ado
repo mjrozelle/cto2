@@ -443,6 +443,7 @@ keep list_name name label
 
 // Remove any empty rows from the dataset
 missings dropobs, force 
+tostring name, replace
 
 // Remove any rows where the "name" variable is not a number (i.e. non-standard labeling)
 drop if !regexm(name, "^[0-9\-]+$") 
@@ -924,7 +925,7 @@ if `want_reshape' == 1 {
 		"*	Reshapable Variables" _n ///
 		"`lbanner'" _n(2)
 	
-	file write myfile2 "local varlist_0 `varlist_0'" _n(2)
+	file write myfile2 `"local varlist_0 `varlist_0'"' _n(2)
 			
 	forvalues i = 1/`n_repeats' {
 			
