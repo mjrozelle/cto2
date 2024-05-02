@@ -677,9 +677,9 @@ if `n_repeats' > 0 {
 		
 	}
 	
+	drop if repetitions == 0
+	
 }
-
-drop if repetitions == 0
 
 gen num_vars = wordcount(vlist)
 gen var_stub = cond(num_vars == 1, vlist, "\`var'")
@@ -763,14 +763,22 @@ tempname codebook
 frame copy `qs' `codebook'
 cwf `codebook'
 
-drop __* vlist desired_vlist shape_vlist label_command format_command ///
+drop vlist desired_vlist shape_vlist label_command format_command ///
 	values_command notes_command var_stub num_vars string_force numeric_force ///
 	note repeat_count type name numeric_calculate
 	
-label define repeat_label `repeat_label'
-label define group_label `group_label'
+if `n_repeats' > 0 {
+	
+	drop __*
+	label define repeat_label `repeat_label'
+	label values repeat_group within repeat_label
+	label variable repetitions "number of repeats for repeat group this variable was in"
+	label variable within "repeat group this repeated variable is nested inside"
+	
+}
+	
 
-label values repeat_group within repeat_label
+label define group_label `group_label'
 label values group group_label
 
 rename order var_uid	
@@ -795,8 +803,6 @@ label variable group "lowest-level group to which question belongs"
 label variable relevant "full set of relevancy conditions for this question"
 label variable original_type "variable type, as specified in instrument"
 label variable preloaded "preloaded variable"
-label variable repetitions "number of repeats for repeat group this variable was in"
-label variable within "repeat group this repeated variable is nested inside"
 label variable command "import dofile command for this variable"
 label variable var_uid "variable unique ID"
 
