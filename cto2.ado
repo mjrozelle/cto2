@@ -283,7 +283,7 @@ forvalues i = 1/`c(N)' {
 		local type = question_type[`j']
 		while `type' == 7 {
 			
-			++j
+			local ++j
 			local type = question_type[`j']
 			
 		}
@@ -303,7 +303,7 @@ forvalues i = 1/`c(N)' {
 		local type = question_type[`j']
 		while `type' == 7 {
 			
-			++j
+			local ++j
 			local type = question_type[`j']
 			
 		}
