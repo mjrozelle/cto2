@@ -281,7 +281,7 @@ forvalues i = 1/`c(N)' {
 		local group_label `group_label' `n_groups' "`=labelStata[`i']'"
 		
 		local type = question_type[`j']
-		while `type' == 7 {
+		while `type' == 7 | `type' < 0  {
 			
 			local ++j
 			local type = question_type[`j']
@@ -301,7 +301,7 @@ forvalues i = 1/`c(N)' {
 		local repeat_label `repeat_label' `n_repeats' "`=labelStata[`i']'"
 		
 		local type = question_type[`j']
-		while `type' == 7 {
+		while `type' == 7 | `type' < 0  {
 			
 			local ++j
 			local type = question_type[`j']
@@ -1015,7 +1015,7 @@ if `want_reshape' == 1 {
 					}
 					
 					local prev_key `prev_name'_key
-					local regex `""_[0-9]+_@ ", "_@ ""'
+					local regex `""_[0-9]+_@ ?", "_@ ""'
 				
 				}
 				
