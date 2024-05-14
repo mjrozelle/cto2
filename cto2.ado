@@ -220,7 +220,7 @@ gen question_type=.
 
 label values question_type question_type_M
 
-replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace") ///
+replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace", "photo") ///
 	| preloaded==1 ///
 	| (type == "calculate" & numeric_calculate == 0) ///
 	| string_force == 1
