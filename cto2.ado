@@ -349,6 +349,9 @@ frame `groups' {
 	label define group_type 1 "Standard Group" 2 "Repeat Group"
 	label values type group_type
 	
+	gen keys = "key" if type == 2
+	label variable keys "unique identifiers in repeat group"
+	
 }
 
 if `n_repeats' != 0 {
@@ -374,6 +377,8 @@ if `n_repeats' != 0 {
 				cap gen nest_level_`t' = .
 				replace nest_level_`t' = `nest' in `row'
 				
+				replace keys = keys + " " + name[`new_row'] + "_key" in `row'
+				
 				cap gen nest_repeats_`t' = .
 				replace nest_repeats_`t' = repetitions[`new_row'] in `row'
 				
@@ -381,6 +386,8 @@ if `n_repeats' != 0 {
 				local nested = `nest' != 0
 				
 			}
+			
+			replace keys = keys + " " + name[`row'] + "_key" in `row'
 			
 		} 
 
@@ -417,7 +424,6 @@ if `n_repeats' != 0 {
 	}
 	
 }
-
 
 tempname repeat_groups
 frame copy `groups' `repeat_groups'
