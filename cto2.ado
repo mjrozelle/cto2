@@ -425,9 +425,86 @@ if `n_repeats' != 0 {
 	
 }
 
-tempname repeat_groups
+tempname repeat_groups nonrepeat_groups
 frame copy `groups' `repeat_groups'
-frame `repeat_groups': drop if type == 1
+frame `repeat_groups' { 
+	
+	drop if type == 1
+	gen cumulative_con = conditions
+	local rgrs = `c(N)'
+	
+	forvalues i = `rgrs'(-1)1 {
+		
+		local w = within[`i']
+		while `w' != 0 {
+			
+			replace cumulative_con = cumulative_con[`w'] + ///
+				cond(!missing(cumulative_con), " & " + cumulative_con, "") /// 
+				if _n == `i'
+			local w = within[`w']
+			
+		}
+		
+	}
+	
+}
+
+frame copy `groups' `nonrepeat_groups'
+frame `nonrepeat_groups' { 
+	
+	drop if type == 2
+	gen cumulative_con = conditions
+	local grs = `c(N)'
+	
+	forvalues i = `grs'(-1)1 {
+		
+		local w = within[`i']
+		while `w' != 0 {
+			
+			replace cumulative_con = cumulative_con[`w'] + ///
+				cond(!missing(cumulative_con), " & " + cumulative_con, "") ///
+				if _n == `i'
+			local w = within[`w']
+			
+		}
+		
+	}
+	
+}
+
+// get group relevancy constraints
+frlink m:1 group, frame(`nonrepeat_groups' index)
+frget cumulative_con, from(`nonrepeat_groups')
+replace relevant = cumulative_con + cond(!missing(relevant), " & " + relevant, "") if !missing(cumulative_con)
+drop `nonrepeat_groups' cumulative_con
+
+// get repeat group relevancy constraints
+frlink m:1 repeat_group, frame(`repeat_groups' index)
+frget cumulative_con, from(`repeat_groups')
+replace relevant = cumulative_con + cond(!missing(relevant), " & " + relevant, "") if !missing(cumulative_con)
+drop `repeat_groups' cumulative_con
+
+// make verbose relevant condition
+clonevar long_relevant = relevant
+forvalues i = 1/`c(N)' {
+	
+	local name = name[`i']
+	local varlabel = labelStata[`i']
+	local vallabel = type2[`i']
+	
+	count if ustrregexm(relevant, "#\{`name'\}")
+	if `r(N)' == 0 continue
+	
+	replace long_relevant = ///
+		ustrregexra(long_relevant, "#\{`name'\}", "'`varlabel''")
+		
+	// future feature - replace numbers with value labels
+// 	count if ustrregexm(relevant, "#\{`name'\}[ ]?[=><][ ]?(\d+)")
+// 	if `r(N)' > 0 {
+//		
+// 	}
+
+}
 
 *===============================================================================
 * 	Choices
@@ -551,6 +628,7 @@ if `n_repeats' > 0 {
 }
 
 gen within_order = .
+replace name = strtrim(stritrim(name))
 clonevar original_name = name 
 clonevar desired_varname = name 
 if "`rename'" != "" {
@@ -727,6 +805,7 @@ gen notes_command = "cap notes " + var_stub + ": " + labelEnglishen + ///
 gen char_command = "" 
 replace char_command = char_command + "cap char " + var_stub + "[qtext] " ///
 	+ labelEnglishen + "`brek'cap char " + var_stub + "[logic] " + relevant + ///
+	"`brek'cap char " + var_stub + "[verbose_logic] " + long_relevant + ///
 	"`brek'cap char " + var_stub + "[preloaded] " + cond(preloaded == 1, "1", "0")
 	
 gen command = "`hbanner'`brek'*`tab2'" + name + "`brek'`hbanner'`brek2'" 
