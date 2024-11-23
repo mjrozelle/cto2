@@ -199,17 +199,54 @@ gen note = type == "note"
 
 local numeric_formulae index area number round count count-if sum ///
 	sum-if min min-if max max-if distance-between int abs duration
-local regex_stubs: subinstr local numeric_formulae " " "|" , all
-local regex_pattern "^(?:`regex_stubs')\("
+
+local length_mac = wordcount("`numeric_formulae'")
+local regex
+local g = 0
+foreach n in `numeric_formulae' {
+	
+	local ++g 
+	if `g' == `length_mac' {
+		
+		local regex `regex'`n'
+		
+	}
+	else {
+		
+		local regex `regex'`n'|
+		
+	}
+	
+}
+
+local regex_pattern "^(?:`regex')\("
 gen numeric_calculate = ustrregexm(calculation, "`regex_pattern'")
 
-local regex_stubs_2 : subinstr local numeric " " "|", all
-local regex_pattern "^`regex_stubs_2'$"
-gen numeric_force = ustrregexm(name, "`regex_pattern'")
+foreach mac in numeric string {
+	
+	local length_mac = wordcount("``mac''")
+	local regex
+	local g = 0
+	foreach n in ``mac'' {
+		
+		local ++g 
+		if `g' == `length_mac' {
+			
+			local regex `regex'`n'
+			
+		}
+		else {
+			
+			local regex `regex'`n'|
+			
+		}
+		
+	}
 
-local regex_stubs_3 : subinstr local string " " "|", all
-local regex_pattern "^`regex_stubs_3'$"
-gen string_force = ustrregexm(name, "`regex_pattern'")
+	local regex_pattern "^(?:`regex')$"
+	gen `mac'_force = ustrregexm(name, "`regex_pattern'")
+	
+}
 
 label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
 	4 "Numeric" 5 "Date" 6 "Datetime" 7 "GPS" ///
@@ -220,7 +257,8 @@ gen question_type=.
 
 label values question_type question_type_M
 
-replace question_type = 1 if inlist(type, "text", "deviceid", "image", "geotrace", "photo") ///
+replace question_type = 1 if inlist(type, "text", "deviceid", "image", ///
+	"geotrace", "photo", "audit", "text audit") ///
 	| preloaded==1 ///
 	| (type == "calculate" & numeric_calculate == 0) ///
 	| string_force == 1
