@@ -251,7 +251,7 @@ foreach mac in numeric string {
 label define question_type_M 1 "String" 2 "Select One" 3 "Select Multiple" ///
 	4 "Numeric" 5 "Date" 6 "Datetime" 7 "GPS" ///
 	-111 "Group Boundary" -222 "Note" ///
-	-333 "Geopoint" -555 "Other" 
+	-555 "Other" 
 	
 gen question_type=.
 
@@ -280,7 +280,6 @@ replace question_type= 7 if type == "geopoint"
 replace question_type = -111 if inlist(type, "begin_group", "end_group", ///
 	"begin_repeat", "end_repeat")
 replace question_type = -222 if note==1
-replace question_type = -333 if type == "text audit"
 replace question_type = -555 if missing(question_type)
 
 drop if question_type < -111
