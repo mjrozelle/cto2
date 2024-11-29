@@ -125,7 +125,7 @@ missings dropobs, force
 if "`rename'" != "" local rencheck new_name
 
 // Loop over a list of variables and ensure that they exist in the dataset
-foreach v in type name calculation relevant repeat_count `rencheck' {
+foreach v in type name calculation relevant repeat_count `rencheck' covariates {
 	cap confirm variable `v'
 	cap tostring `v', replace
 	if (_rc) {
@@ -927,6 +927,7 @@ label variable original_type "variable type, as specified in instrument"
 label variable preloaded "preloaded variable"
 label variable command "import dofile command for this variable"
 label variable var_uid "variable unique ID"
+cap label variable covariates "covariates"
 
 if "`savefolder'" != "" {
 	
