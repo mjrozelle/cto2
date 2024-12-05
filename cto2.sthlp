@@ -49,7 +49,7 @@
 {cmd:cto2} is a Stata command for streamlined processing of SurveyCTO data, especially useful for surveys designed in Excel. It reads the survey instrument and the SurveyCTO-exported .csv data, then creates a dofile for importing and initially cleaning the data.
 
 {pstd}
-It includes advanced features for data management, such as reshaping data to long format, identifying unique survey identifiers, handling different date formats, and specifying folders for saving processed datasets. Additionally, it can copy certain variables to all reshaped datasets, remove identifiers for deidentification, and handle special response values.
+It includes advanced features for data management, such as reshaping data to long format, saving datasets of survey metadata, handling different date formats, and specifying folders for saving processed datasets. Additionally, it can copy certain variables to all reshaped datasets, remove identifying data for deidentification, and handle special response values.
 
 {title:Remarks}
 
