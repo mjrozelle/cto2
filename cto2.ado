@@ -23,7 +23,8 @@ syntax, ///
 	RENAME /// use if you have filled in the "new_name" column and wish to rename variables
 	REPLACE /// use to replace existing dofiles
 	NUMERIC(namelist) /// use to force numeric variables to be read as numeric
-	STRING(namelist)] // use to force string variables to be read as string
+	STRING(namelist) /// use to force string variables to be read as string
+	KEEP(namelist)] // use to "keep" survey-level variables generated outside the immediate survey
 	
 pause on
 
@@ -1240,7 +1241,7 @@ if `want_reshape' == 1 {
 			"`hbanner'" ///
 			_n "* 	Survey-Level" _n /// 
 			"`hbanner'" _n(2) ///
-			`"keep \`varlist_0' key submissiondate formdef_version"' _n ///
+			`"keep \`varlist_0' key submissiondate formdef_version `keep'"' _n ///
 			"compress" _n ///
 			`"label data "survey-level data from `file_short'""' _n ///
 			`"save "`macval(savefolder)'/survey.dta", replace"'
