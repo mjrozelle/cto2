@@ -655,12 +655,14 @@ frame `qsframe' {
 
 	local n_groups = 0
 	local n_repeats = 0
+	local n_posted = 0
 	local groupstack_idx 0
 	local repeatstack_idx 0
 
 	// Create groups frame with proper structure
 	frame `groupsframe' {
 		clear
+		gen int row_n = .
 		gen int type = .
 		gen strL name = ""
 		gen strL label = ""
@@ -700,7 +702,8 @@ frame `qsframe' {
 			local parent = word("`groupstack_idx'", -2)
 			if "`parent'" == "" local parent 0
 
-			frame post `groupsframe' (1) (name[`i']) (labelStata[`i']) ///
+			local ++n_posted
+			frame post `groupsframe' (`n_posted') (1) (name[`i']) (labelStata[`i']) ///
 				(repeat_count[`i']) (.) (`i') (`n_groups') ///
 				(relevant[`i']) (`parent') (name[`j']) (0) ("") ("")
 
@@ -727,7 +730,8 @@ frame `qsframe' {
 			local parent = word("`repeatstack_idx'", -2)
 			if "`parent'" == "" local parent 0
 
-			frame post `groupsframe' (2) (name[`i']) (labelStata[`i']) ///
+			local ++n_posted
+			frame post `groupsframe' (`n_posted') (2) (name[`i']) (labelStata[`i']) ///
 				(repeat_count[`i']) (.) (`i') (`n_repeats') ///
 				(relevant[`i']) (`parent') (name[`j']) (0) ("key") ("")
 
@@ -786,7 +790,7 @@ if `n_repeats' > 0 {
 			local repeat_var `repeat_var'_1
 
 			// Find the parent repeat group row
-			levelsof _n if type == 2 & index == `nest', clean local(parent_row)
+			levelsof row_n if type == 2 & index == `nest', clean local(parent_row)
 
 			// Track nesting info
 			cap gen int nest_level_`layers' = .
@@ -836,7 +840,7 @@ forvalues i = `c(N)'(-1)1 {
 	local w = within[`i']
 	while `w' != 0 {
 		// Find the row for this parent group
-		levelsof _n if type == 1 & index == `w', clean local(parent_row)
+		levelsof row_n if type == 1 & index == `w', clean local(parent_row)
 		if "`parent_row'" != "" {
 			local parent_con = conditions[`parent_row']
 			if "`parent_con'" != "" {
@@ -860,7 +864,7 @@ forvalues i = `c(N)'(-1)1 {
 	replace cumulative_con = conditions in `i'
 	local w = within[`i']
 	while `w' != 0 {
-		levelsof _n if type == 2 & index == `w', clean local(parent_row)
+		levelsof row_n if type == 2 & index == `w', clean local(parent_row)
 		if "`parent_row'" != "" {
 			local parent_con = conditions[`parent_row']
 			if "`parent_con'" != "" {
