@@ -1131,7 +1131,6 @@ if `n_repeats' > 0 {
 		forvalues r = 1/`n_rg' {
 
 			// Only process repeat groups that actually have repetitions
-			local reps = repetitions[`=_n' + 0] if type == 2 & index == `r'
 			levelsof repetitions if type == 2 & index == `r', clean local(reps)
 			levelsof layers_nested if type == 2 & index == `r', clean local(layers)
 			if "`layers'" == "" local layers 0
@@ -1218,12 +1217,12 @@ gen format_command = ""
 
 // String variables: tostring + clean missing dots
 replace format_command = ///
-	"tostring " + var_stub + ", replace" + "`brek'" + ///
-	`"replace "' + var_stub + `" = "" if "' + var_stub + `" == ".""' ///
+	"cap tostring " + var_stub + ", replace" + "`brek'" + ///
+	`"cap replace "' + var_stub + `" = "" if "' + var_stub + `" == ".""' ///
 	if question_type == 1 | (question_type == 3 & within_order == 1)
 
 // Numeric variables: destring
-replace format_command = "destring " + var_stub + ", replace" ///
+replace format_command = "cap destring " + var_stub + ", replace" ///
 	if inlist(question_type, 2, 4, 7) ///
 	| (question_type == 3 & within_order > 1)
 
@@ -1282,19 +1281,19 @@ else {
 }
 
 // --- Value label command --------------------------------------------
-gen values_command = "label values " + var_stub + " " + type2 ///
-	if !missing(type2) & !inlist(question_type, 3, 7)
+gen values_command = "cap label values " + var_stub + " " + type2 ///
+	if !missing(type2) & inlist(question_type, 2, 4)
 
 // --- Notes command --------------------------------------------------
-gen notes_command = "notes " + var_stub + ": " + labelEnglishen + ///
-	"`brek'" + "notes " + var_stub + ": relevance conditions: " + relevant
+gen notes_command = "cap notes " + var_stub + ": " + labelEnglishen + ///
+	"`brek'" + "cap notes " + var_stub + ": relevance conditions: " + relevant
 
 // --- Characteristics command ----------------------------------------
 gen char_command = ///
-	"char " + var_stub + "[qtext] " + labelEnglishen + "`brek'" + ///
-	"char " + var_stub + "[logic] " + relevant + "`brek'" + ///
-	"char " + var_stub + "[verbose_logic] " + long_relevant + "`brek'" + ///
-	"char " + var_stub + "[preloaded] " + cond(preloaded == 1, "1", "0")
+	"cap char " + var_stub + "[qtext] " + labelEnglishen + "`brek'" + ///
+	"cap char " + var_stub + "[logic] " + relevant + "`brek'" + ///
+	"cap char " + var_stub + "[verbose_logic] " + long_relevant + "`brek'" + ///
+	"cap char " + var_stub + "[preloaded] " + cond(preloaded == 1, "1", "0")
 
 // --- Assemble full command ------------------------------------------
 // Each variable block: wrapped in cap confirm variable / if !_rc { }
