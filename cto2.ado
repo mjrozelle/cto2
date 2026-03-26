@@ -642,8 +642,8 @@ forvalues i = 1/`c(N)' {
 	}
 
 	// Assign current innermost group/repeat
-	replace group = `:word `-1' of `groupstack'' in `i'
-	replace repeat_group = `:word `-1' of `repeatstack'' in `i'
+	replace group = real(word("`groupstack'", -1)) in `i'
+	replace repeat_group = real(word("`repeatstack'", -1)) in `i'
 }
 
 // --- Build groups frame ---------------------------------------------
@@ -697,7 +697,7 @@ frame `qsframe' {
 			}
 			if !`found_example' local j = `i' + 1
 
-			local parent : word `-2' of `groupstack_idx'
+			local parent = word("`groupstack_idx'", -2)
 			if "`parent'" == "" local parent 0
 
 			frame post `groupsframe' (1) (name[`i']) (labelStata[`i']) ///
@@ -724,7 +724,7 @@ frame `qsframe' {
 			}
 			if !`found_example' local j = `i' + 1
 
-			local parent : word `-2' of `repeatstack_idx'
+			local parent = word("`repeatstack_idx'", -2)
 			if "`parent'" == "" local parent 0
 
 			frame post `groupsframe' (2) (name[`i']) (labelStata[`i']) ///
