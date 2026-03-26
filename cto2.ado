@@ -1,6 +1,6 @@
 *! cto2.ado - Stata module to import and minimally clean SurveyCTO data
 *! Author: Michael Rozelle <michael.rozelle@wur.nl>
-*! Version 2.0.0  Modified:  March 2026
+*! Version 2.1.0  Modified:  March 2026
 
 // Drop all cto2 programs before (re)defining them
 foreach prog in cto2 _cto2_validate _cto2_parse_survey _cto2_parse_groups ///
@@ -33,7 +33,8 @@ syntax, ///
 	REPLACE /// use to replace existing dofiles
 	NUMERIC(namelist) /// use to force specific variables to be read as numeric
 	STRING(namelist) /// use to force specific variables to be read as string
-	KEEP(namelist)] // use to "keep" survey-level variables generated outside the immediate survey
+	KEEP(namelist) /// use to "keep" survey-level variables generated outside the immediate survey
+	CODEBOOK] // export a CSV codebook to savefolder
 
 version 17
 
@@ -223,6 +224,17 @@ capture noisily {
 		}
 
 		frame `groups': save "`savefolder'/group_metadata.dta", replace
+
+		// Export CSV codebook if requested
+		if "`codebook'" != "" {
+			tempname cb_export
+			frame copy `codebook' `cb_export'
+			frame `cb_export' {
+				cap keep order name varlabel original_type vallabel group repeat_group
+				export delimited "`savefolder'/codebook.csv", replace
+			}
+			noisily display as text "  Codebook saved to `savefolder'/codebook.csv"
+		}
 
 		noisily display as text "Metadata saved to `savefolder'/"
 	}
@@ -461,10 +473,8 @@ foreach v in calculation relevant repeat_count {
 // Dollar signs -> # (prevents Stata macro expansion in labels/notes)
 // Line breaks and double quotes removed
 foreach v of varlist labelEnglishen labelStata relevant repeat_count calculation {
-	replace `v' = subinstr(`v', "$", "#", .)
-	replace `v' = subinstr(`v', char(10), "", .)
-	replace `v' = subinstr(`v', char(13), "", .)
-	replace `v' = subinstr(`v', `"""', "", .)
+	replace `v' = subinstr(subinstr(subinstr(subinstr(`v', ///
+		"$", "#", .), char(10), "", .), char(13), "", .), `"""', "", .)
 }
 
 // Fill in missing Stata labels with English labels
@@ -514,9 +524,10 @@ label define question_type_M ///
 gen question_type = .
 label values question_type question_type_M
 
-// String types
+// String types (including media types)
 replace question_type = 1 if ///
 	inlist(type, "text", "deviceid", "image", "geotrace", "photo", "audit", "text audit") ///
+	| inlist(type, "video", "signature", "barcode", "file") ///
 	| preloaded == 1 ///
 	| (type == "calculate" & numeric_calculate == 0) ///
 	| string_force == 1
@@ -548,7 +559,22 @@ replace question_type = -111 if ///
 replace question_type = -222 if note == 1
 replace question_type = -555 if missing(question_type)
 
-// Drop completely unclassifiable types (below -111)
+// Warn about unhandled field types, then reclassify as numeric
+count if question_type == -555
+if `r(N)' > 0 {
+	levelsof type if question_type == -555, clean local(unhandled)
+	noisily display as result "Warning: unhandled field types (treated as numeric): `unhandled'"
+	replace question_type = 4 if question_type == -555
+}
+
+// Warn about or_other fields
+count if ustrregexm(type, "or_other")
+if `r(N)' > 0 {
+	noisily display as result ///
+		"Warning: or_other fields detected. Auto-generated _other columns need manual handling."
+}
+
+// Drop structural/metadata types
 drop if question_type < -111
 
 // Create order variable to preserve instrument ordering
@@ -768,11 +794,22 @@ frame `qsframe' {
 // --- Count repetitions from raw data variable names -----------------
 cwf `groupsframe'
 
+// Warn about dynamic repeat_count expressions
+count if ustrregexm(repeat_count, "#\{") & type == 2
+if `r(N)' > 0 {
+	noisily display as result ///
+		"Warning: dynamic repeat_count expressions detected. Reshape dofile may need manual adjustment."
+}
+
 local n_repeats = 0
 count if type == 2
 local n_repeats = `r(N)'
 
 if `n_repeats' > 0 {
+
+	// Get all variable names from raw data once (avoid frame switching in loop)
+	frame `rawframe': ds *
+	local all_raw_vars `r(varlist)'
 
 	forvalues i = 1/`c(N)' {
 
@@ -808,17 +845,12 @@ if `n_repeats' > 0 {
 		// Add own key
 		replace keys = keys + " " + name[`i'] + "_key" in `i'
 
-		// Count repetitions using ds in raw data frame (replaces findregex)
-		frame `rawframe' {
-			cap ds `repeat_var'_*
-			local matched_vars `r(varlist)'
-			local max_num = 0
-			foreach var in `matched_vars' {
-				// Extract trailing number
+		// Count repetitions from pre-fetched variable list (no frame switch)
+		local max_num = 0
+		foreach var in `all_raw_vars' {
+			if ustrregexm("`var'", "^`repeat_var'_([0-9]+)$") {
 				local num = real(ustrregexra("`var'", ".*_(\d+)$", "$1"))
-				if !missing(`num') & `num' > `max_num' {
-					local max_num = `num'
-				}
+				if !missing(`num') & `num' > `max_num' local max_num = `num'
 			}
 		}
 
@@ -1087,7 +1119,32 @@ foreach i in `gps_vars' {
 
 assert !missing(desired_varname)
 
-// Remove duplicate variable names (keep first occurrence)
+// Validate variable name lengths (Stata 32-char limit)
+gen _vname_len = strlen(desired_varname)
+count if _vname_len > 32
+if `r(N)' > 0 {
+	noisily display as error "Variable names exceed Stata's 32-character limit:"
+	levelsof desired_varname if _vname_len > 32, clean local(toolong)
+	foreach v in `toolong' {
+		noisily display as error `"  `v' (`=strlen("`v'")' chars)"'
+	}
+	drop _vname_len
+	exit 198
+}
+drop _vname_len
+
+// Warn about duplicate variable names, then keep first occurrence
+bysort desired_varname (order): gen _dup_count = _N
+count if _dup_count > 1
+if `r(N)' > 0 {
+	noisily display as result ///
+		"Warning: duplicate variable names detected (keeping first occurrence):"
+	levelsof desired_varname if _dup_count > 1, clean local(dups)
+	foreach d in `dups' {
+		noisily display as result "  `d'"
+	}
+}
+drop _dup_count
 bysort desired_varname (order): keep if _n == 1
 sort order within_order
 replace n = _n

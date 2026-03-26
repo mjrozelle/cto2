@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 2.00 26Mar2026}{...}
+{* *! version 2.10 26Mar2026}{...}
 {hline}
 {cmd:help cto2}
 {hline}
@@ -55,6 +55,7 @@
 
 {syntab :Output control}
 {synopt :{opt REPLACE}}overwrite existing dofiles{p_end}
+{synopt :{opt CODEBOOK}}export a CSV codebook to {opt SAVEfolder}; requires {opt SAVEfolder()}{p_end}
 {synoptline}
 
 {title:Description}
@@ -133,6 +134,11 @@ The generated dofiles are designed to be inspected and edited before running. Th
 
 {pstd}
 All three codes must be distinct when specified.
+
+{dlgtab:Codebook}
+
+{phang}
+{opt CODEBOOK} exports a CSV file ({it:codebook.csv}) to {opt SAVEfolder} containing variable names, labels, types, value label names, and group assignments. Requires {opt SAVEfolder()}.
 
 {title:Output files}
 
