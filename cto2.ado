@@ -52,10 +52,10 @@ local want_reshape = ("`reshapefile'" != "")
 preserve
 local original_frame `c(frame)'
 
-// Wrap main body — cleanup happens on error or success
+// Wrap main body -- cleanup happens on error or success
 capture noisily {
 
-	// ─── Phase 1: Validate ───────────────────────────────────────────────
+	// --- Phase 1: Validate -----------------------------------------------
 	noisily display as text "Validating inputs..."
 
 	_cto2_validate, ///
@@ -64,7 +64,7 @@ capture noisily {
 		dk(`dk') other(`other') refused(`refused') ///
 		`replace' want_reshape(`want_reshape')
 
-	// ─── Phase 2: Parse Survey ───────────────────────────────────────────
+	// --- Phase 2: Parse Survey -------------------------------------------
 	tempname qs rawdata
 	frame create `qs'
 	frame create `rawdata'
@@ -87,7 +87,7 @@ capture noisily {
 	}
 	noisily display as text "  `n_questions' questions found."
 
-	// ─── Phase 3: Parse Groups ───────────────────────────────────────────
+	// --- Phase 3: Parse Groups -------------------------------------------
 	tempname groups
 	frame create `groups'
 
@@ -103,7 +103,7 @@ capture noisily {
 	noisily display as text ///
 		"  `n_groups' groups, `n_repeats' repeat groups."
 
-	// ─── Phase 4: Parse Choices ──────────────────────────────────────────
+	// --- Phase 4: Parse Choices ------------------------------------------
 	tempname choices
 	frame create `choices'
 
@@ -119,7 +119,7 @@ capture noisily {
 	}
 	noisily display as text "  `n_lists' choice lists."
 
-	// ─── Phase 5: Expand Variables ───────────────────────────────────────
+	// --- Phase 5: Expand Variables ---------------------------------------
 	noisily display as text "Expanding variables..."
 
 	_cto2_expand_vars, ///
@@ -128,14 +128,14 @@ capture noisily {
 		rename("`rename'") deidvars("`deidvars'") ///
 		n_repeats(`n_repeats')
 
-	// ─── Phase 6: Build Commands ─────────────────────────────────────────
+	// --- Phase 6: Build Commands -----------------------------------------
 	noisily display as text "Building cleaning commands..."
 
 	_cto2_build_commands, ///
 		qsframe(`qs') datestyle("`datestyle'") ///
 		rename("`rename'")
 
-	// ─── Phase 7: Save Metadata ──────────────────────────────────────────
+	// --- Phase 7: Save Metadata ------------------------------------------
 	if "`savefolder'" != "" {
 
 		cap mkdir "`savefolder'"
@@ -227,7 +227,7 @@ capture noisily {
 		noisily display as text "Metadata saved to `savefolder'/"
 	}
 
-	// ─── Phase 8: Write Import Dofile ────────────────────────────────────
+	// --- Phase 8: Write Import Dofile ------------------------------------
 	noisily display as text "Writing import dofile..."
 
 	_cto2_write_import, ///
@@ -239,12 +239,12 @@ capture noisily {
 
 	noisily display as text "  Created: `dofile'"
 
-	// ─── Phase 9: Write Reshape Dofile (conditional) ─────────────────────
+	// --- Phase 9: Write Reshape Dofile (conditional) ---------------------
 	if `want_reshape' {
 
 		if `n_repeats' == 0 {
 			noisily display as error ///
-				"No repeat groups found in survey — skipping reshape dofile."
+				"No repeat groups found in survey -- skipping reshape dofile."
 		}
 		else {
 			noisily display as text "Writing reshape dofile..."
@@ -421,7 +421,7 @@ if !_rc {
 else {
 	cap confirm variable labelStata
 	if _rc {
-		// No label column at all — create empty ones
+		// No label column at all -- create empty ones
 		gen labelEnglishen = ""
 		gen labelStata = ""
 	}
@@ -444,8 +444,8 @@ foreach v in calculation relevant repeat_count {
 	if _rc gen `v' = ""
 }
 
-// ─── String cleaning (single pass) ──────────────────────────────────
-// Dollar signs → # (prevents Stata macro expansion in labels/notes)
+// --- String cleaning (single pass) ----------------------------------
+// Dollar signs -> # (prevents Stata macro expansion in labels/notes)
 // Line breaks and double quotes removed
 foreach v of varlist labelEnglishen labelStata relevant repeat_count calculation {
 	replace `v' = subinstr(`v', "$", "#", .)
@@ -471,7 +471,7 @@ replace name = strtrim(stritrim(name))
 split type
 // type2 now contains the choice list name for select_one/select_multiple
 
-// ─── Question type classification ───────────────────────────────────
+// --- Question type classification -----------------------------------
 gen preloaded = regexm(calculation, "^pulldata")
 gen note = (type == "note")
 
@@ -554,7 +554,7 @@ syntax, qsframe(string) rawframe(string) groupsframe(string)
 cwf `qsframe'
 sort order
 
-// ─── Vectorized group assignment ────────────────────────────────────
+// --- Vectorized group assignment ------------------------------------
 // Create indicator variables for group boundaries
 gen is_begin_group = (type == "begin_group")
 gen is_end_group = (type == "end_group")
@@ -574,12 +574,12 @@ gen repeat_group = sum(is_begin_repeat)
 // For questions outside any repeat group, assign 0
 replace repeat_group = 0 if repeat_depth == 0 & !is_begin_repeat
 
-// ─── Assign group/repeat IDs correctly using stack approach ─────────
+// --- Assign group/repeat IDs correctly using stack approach ---------
 // The vectorized running sum gives us depth, but we need the ID of the
 // *innermost* group at each row. We still need a loop for this, but we
 // only loop over begin/end boundary rows (much fewer than total rows).
 
-// Reset — we'll fill these properly
+// Reset -- we'll fill these properly
 replace group = 0
 replace repeat_group = 0
 
@@ -633,7 +633,7 @@ forvalues i = 1/`c(N)' {
 	replace repeat_group = `:word `-1' of `repeatstack'' in `i'
 }
 
-// ─── Build groups frame ─────────────────────────────────────────────
+// --- Build groups frame ---------------------------------------------
 // Extract begin_group and begin_repeat rows into the groups frame
 cwf `groupsframe'
 
@@ -748,7 +748,7 @@ frame `qsframe' {
 	}
 }
 
-// ─── Count repetitions from raw data variable names ─────────────────
+// --- Count repetitions from raw data variable names -----------------
 cwf `groupsframe'
 
 local n_repeats = 0
@@ -813,7 +813,7 @@ if `n_repeats' > 0 {
 	local nest_layers = `r(max)'
 }
 
-// ─── Build cumulative relevance conditions ──────────────────────────
+// --- Build cumulative relevance conditions --------------------------
 // For groups (type == 1)
 forvalues i = `c(N)'(-1)1 {
 
@@ -863,7 +863,7 @@ forvalues i = `c(N)'(-1)1 {
 	}
 }
 
-// ─── Apply group conditions back to questions ───────────────────────
+// --- Apply group conditions back to questions -----------------------
 cwf `qsframe'
 
 // Apply non-repeat group conditions
@@ -899,7 +899,7 @@ frame `groupsframe' {
 	}
 }
 
-// ─── Build verbose relevance (expand variable references) ───────────
+// --- Build verbose relevance (expand variable references) -----------
 cwf `qsframe'
 clonevar long_relevant = relevant
 
@@ -1009,7 +1009,7 @@ if "`rename'" != "" {
 	}
 }
 
-// ─── Expand select_multiple variables ───────────────────────────────
+// --- Expand select_multiple variables -------------------------------
 gen n = _n
 levelsof order if question_type == 3, clean local(mult_selects)
 
@@ -1048,7 +1048,7 @@ foreach i in `mult_selects' {
 	replace n = _n
 }
 
-// ─── Expand GPS variables ───────────────────────────────────────────
+// --- Expand GPS variables -------------------------------------------
 levelsof order if question_type == 7, clean local(gps_vars)
 
 foreach i in `gps_vars' {
@@ -1075,7 +1075,7 @@ bysort desired_varname (order): keep if _n == 1
 sort order within_order
 replace n = _n
 
-// ─── Build variable lists for reshape ───────────────────────────────
+// --- Build variable lists for reshape -------------------------------
 gen vlist = name
 gen desired_vlist = desired_varname
 gen shape_vlist = ""
@@ -1172,7 +1172,7 @@ if `n_repeats' > 0 {
 gen num_vars = wordcount(vlist)
 gen var_stub = cond(num_vars == 1, vlist, "\`var'")
 
-// ─── Build per-repeat-group variable lists ──────────────────────────
+// --- Build per-repeat-group variable lists --------------------------
 // These are stored as locals via c_local for the write phases
 
 end
@@ -1193,10 +1193,10 @@ local tab2 `tab'`tab'
 local hbanner = "*" + ("=") * 65
 local lbanner = "*" + ("-") * 65
 
-// ─── Variable label command ─────────────────────────────────────────
+// --- Variable label command -----------------------------------------
 gen label_command = "label variable " + var_stub + `" ""' + labelStata + `"""'
 
-// ─── Format/type command ────────────────────────────────────────────
+// --- Format/type command --------------------------------------------
 gen format_command = ""
 
 // String variables: tostring + clean missing dots
@@ -1212,7 +1212,7 @@ replace format_command = "destring " + var_stub + ", replace" ///
 
 // Date variables
 if "`datestyle'" == "YMD" {
-	// ISO format — try YMD first
+	// ISO format -- try YMD first
 	replace format_command = ///
 		"tempvar date" + "`brek'" + ///
 		"clonevar \`date' = " + var_stub + "`brek'" + ///
@@ -1264,22 +1264,22 @@ else {
 		if question_type == 6
 }
 
-// ─── Value label command ────────────────────────────────────────────
+// --- Value label command --------------------------------------------
 gen values_command = "label values " + var_stub + " " + type2 ///
 	if !missing(type2) & !inlist(question_type, 3, 7)
 
-// ─── Notes command ──────────────────────────────────────────────────
+// --- Notes command --------------------------------------------------
 gen notes_command = "notes " + var_stub + ": " + labelEnglishen + ///
 	"`brek'" + "notes " + var_stub + ": relevance conditions: " + relevant
 
-// ─── Characteristics command ────────────────────────────────────────
+// --- Characteristics command ----------------------------------------
 gen char_command = ///
 	"char " + var_stub + "[qtext] " + labelEnglishen + "`brek'" + ///
 	"char " + var_stub + "[logic] " + relevant + "`brek'" + ///
 	"char " + var_stub + "[verbose_logic] " + long_relevant + "`brek'" + ///
 	"char " + var_stub + "[preloaded] " + cond(preloaded == 1, "1", "0")
 
-// ─── Assemble full command ──────────────────────────────────────────
+// --- Assemble full command ------------------------------------------
 // Each variable block: wrapped in cap confirm variable / if !_rc { }
 // For multi-value variables (repeat groups), use foreach loop
 
@@ -1316,7 +1316,7 @@ replace command = ///
 	"}" ///
 	if num_vars > 1
 
-// ─── Rename commands (if applicable) ────────────────────────────────
+// --- Rename commands (if applicable) --------------------------------
 if "`rename'" != "" {
 	cap confirm variable new_name
 	if !_rc {
@@ -1349,7 +1349,7 @@ local hbanner = "*" + ("=") * 65
 local lbanner = "*" + ("-") * 65
 local version = max(`c(stata_version)', 17)
 
-// ─── Build value label commands from choices frame ──────────────────
+// --- Build value label commands from choices frame ------------------
 frame `choicesframe' {
 
 	local labels_counter = 0
@@ -1384,7 +1384,7 @@ frame `choicesframe' {
 	}
 }
 
-// ─── Open file and write ────────────────────────────────────────────
+// --- Open file and write --------------------------------------------
 cap file close myfile
 file open myfile using "`dofile'", write text replace
 
@@ -1534,7 +1534,7 @@ local lbanner = "*" + ("-") * 65
 // Extract short instrument filename
 local file_short = ustrregexrf("`instname'", "^.*[/\\]", "")
 
-// ─── Build variable lists ───────────────────────────────────────────
+// --- Build variable lists -------------------------------------------
 // varlist_0: survey-level variables
 // varlist_i: variables for repeat group i
 // shapelist_i: reshape stub variables for repeat group i
@@ -1580,7 +1580,7 @@ frame `qsframe' {
 	}
 }
 
-// ─── Open file and write header ─────────────────────────────────────
+// --- Open file and write header -------------------------------------
 cap file close myfile2
 file open myfile2 using "`reshapefile'", write text replace
 
@@ -1616,7 +1616,7 @@ frame `groupsframe' {
 	}
 }
 
-// ─── Reshape section ────────────────────────────────────────────────
+// --- Reshape section ------------------------------------------------
 file write myfile2 ///
 	"`hbanner'" ///
 	_n "* 	Reshaping" _n ///
@@ -1629,7 +1629,7 @@ if "`deidvars'" != "" {
 	file write myfile2 _n `"local deidvars `deidvars'"'
 }
 
-// ─── Write reshape commands for each repeat group ───────────────────
+// --- Write reshape commands for each repeat group -------------------
 frame `groupsframe' {
 
 	forvalues i = 1/`c(N)' {
