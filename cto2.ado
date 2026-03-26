@@ -413,22 +413,35 @@ foreach v in `optional' {
 }
 
 // Handle label columns
+// Instruments may have: "label" only, "labelEnglishen" only,
+// "labelStata" only, both "label" and "labelStata", or none.
+cap confirm variable labelEnglishen
+local has_labelEn = !_rc
+cap confirm variable labelStata
+local has_labelSt = !_rc
 cap confirm variable label
-if !_rc {
+local has_label = !_rc
+
+if `has_label' & !`has_labelEn' {
+	// "label" exists but "labelEnglishen" does not -- rename it
 	rename label labelEnglishen
+}
+else if `has_label' & `has_labelEn' {
+	// Both exist -- drop the generic one, keep the specific one
+	drop label
+}
+else if !`has_label' & !`has_labelEn' {
+	// Neither exists -- create empty
+	gen labelEnglishen = ""
+}
+
+cap tostring labelEnglishen, replace
+
+if !`has_labelSt' {
 	clonevar labelStata = labelEnglishen
 }
 else {
-	cap confirm variable labelStata
-	if _rc {
-		// No label column at all -- create empty ones
-		gen labelEnglishen = ""
-		gen labelStata = ""
-	}
-	else {
-		cap tostring labelStata, replace
-		gen labelEnglishen = labelStata
-	}
+	cap tostring labelStata, replace
 }
 
 keep `keepvars' labelEnglishen labelStata
