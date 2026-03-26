@@ -3,11 +3,15 @@
 *! Version 2.1.0  Modified:  March 2026
 
 // Drop all cto2 programs before (re)defining them
-foreach prog in cto2 _cto2_validate _cto2_parse_survey _cto2_parse_groups ///
-	_cto2_parse_choices _cto2_expand_vars _cto2_build_commands ///
-	_cto2_write_import _cto2_write_reshape {
-	cap program drop `prog'
-}
+cap program drop cto2
+cap program drop _cto2_validate
+cap program drop _cto2_parse_survey
+cap program drop _cto2_parse_groups
+cap program drop _cto2_parse_choices
+cap program drop _cto2_expand_vars
+cap program drop _cto2_build_commands
+cap program drop _cto2_write_import
+cap program drop _cto2_write_reshape
 
 *===============================================================================
 *	Main Program
