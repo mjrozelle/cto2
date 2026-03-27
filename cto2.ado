@@ -716,11 +716,12 @@ frame `qsframe' {
 			local groupstack_idx `groupstack_idx' `n_groups'
 
 			// Find first real variable after this group boundary
+			// Skip GPS (7) and select_multiple (3) to avoid suffix collisions
 			local j = `i' + 1
 			local found_example = 0
 			while `j' <= `c(N)' & !`found_example' {
 				local qt = question_type[`j']
-				if `qt' > 0 & `qt' != 7 {
+				if `qt' > 0 & !inlist(`qt', 3, 7) {
 					local found_example = 1
 				}
 				else {
@@ -1480,7 +1481,7 @@ file write myfile ///
 	"`hbanner'" ///
 	_n "* 	Setup" _n ///
 	"`hbanner'" ///
-	_n(2) "clear all" _n "version `version'" _n "set more off" ///
+	_n(2) "clear" _n "version `version'" _n "set more off" ///
 	_n "set maxvar 120000" ///
 	_n "cap log close" _n "set trace off" _n "set linesize 200" _n(2)
 
