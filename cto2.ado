@@ -1481,7 +1481,7 @@ file write myfile ///
 	"`hbanner'" ///
 	_n "* 	Setup" _n ///
 	"`hbanner'" ///
-	_n(2) "clear" _n "version `version'" _n "set more off" ///
+	_n(2) "clear" _n "frames reset" _n "version `version'" _n "set more off" ///
 	_n "set maxvar 120000" ///
 	_n "cap log close" _n "set trace off" _n "set linesize 200" _n(2)
 
