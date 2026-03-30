@@ -1,6 +1,6 @@
 *! cto2.ado - Stata module to import and minimally clean SurveyCTO data
 *! Author: Michael Rozelle <michael.rozelle@wur.nl>
-*! Version 2.1.0  Modified:  March 2026
+*! Version 2.1.1  Modified:  March 2026
 
 // Drop all cto2 programs before (re)defining them
 cap program drop cto2
@@ -77,7 +77,7 @@ capture noisily {
 	// Import raw data header (row 1 only) for variable name detection
 	frame `rawdata' {
 		import delimited "`dataname'", clear bindquote(strict) ///
-			case(preserve) rowrange(:1)
+			case(preserve) rowrange(:1) maxquotedrows(unlimited)
 		compress
 	}
 
