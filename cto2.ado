@@ -1,6 +1,6 @@
 *! cto2.ado - Stata module to import and minimally clean SurveyCTO data
 *! Author: Michael Rozelle <michael.rozelle@wur.nl>
-*! Version 2.1.1  Modified:  March 2026
+*! Version 2.1.2  Modified:  April 2026
 
 // Drop all cto2 programs before (re)defining them
 cap program drop cto2
@@ -1757,7 +1757,8 @@ frame `groupsframe' {
 				}
 				else {
 					local u = `k' + 1
-					local w = nest_level_`u'[`i']
+					local w_idx = nest_level_`u'[`i']
+					levelsof row_n if type == 2 & index == `w_idx', clean local(w)
 					local prev_desc = label[`w']
 					local prev_name = name[`w']
 				}
@@ -1767,13 +1768,16 @@ frame `groupsframe' {
 			}
 
 			if `counter' == 0 {
-				local to `rg_idx'
+				local to `i'
 				local previous_frames survey
 			}
 			else {
 				local p = `k' + 1
-				local prev_frame = name[`=nest_level_`p'[`i']']
-				local to nest_level_`counter'[`i']
+				local pf_idx = nest_level_`p'[`i']
+				levelsof row_n if type == 2 & index == `pf_idx', clean local(pf_row)
+				local prev_frame = name[`pf_row']
+				local to_idx = nest_level_`counter'[`i']
+				levelsof row_n if type == 2 & index == `to_idx', clean local(to)
 				local previous_frames `previous_frames' `prev_frame'
 			}
 
