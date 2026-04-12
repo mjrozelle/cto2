@@ -1297,7 +1297,7 @@ if "`datestyle'" == "YMD" {
 		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
-		`"replace "' + var_stub + ///
+		`"cap replace "' + var_stub + ///
 		`" = date(\`date', "YMD", 2030) if !missing(\`date')"' + "`brek'" + ///
 		`"format "' + var_stub + `" %td"' ///
 		if question_type == 5
@@ -1310,7 +1310,7 @@ else {
 		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
-		`"replace "' + var_stub + ///
+		`"cap replace "' + var_stub + ///
 		`" = date(\`date', "`datestyle'", 2030) if !missing(\`date')"' + "`brek'" + ///
 		`"format "' + var_stub + `" %td"' ///
 		if question_type == 5
@@ -1324,7 +1324,7 @@ if "`datestyle'" == "YMD" {
 		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
-		`"replace "' + var_stub + ///
+		`"cap replace "' + var_stub + ///
 		`" = clock(\`date', "YMDhms", 2030) if !missing(\`date')"' + "`brek'" + ///
 		`"format "' + var_stub + `" %tc"' ///
 		if question_type == 6
@@ -1336,7 +1336,7 @@ else {
 		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
-		`"replace "' + var_stub + ///
+		`"cap replace "' + var_stub + ///
 		`" = clock(\`date', "`datestyle'hms", 2030) if !missing(\`date')"' + "`brek'" + ///
 		`"format "' + var_stub + `" %tc"' ///
 		if question_type == 6
