@@ -1,6 +1,6 @@
 *! cto2.ado - Stata module to import and minimally clean SurveyCTO data
 *! Author: Michael Rozelle <michael.rozelle@wur.nl>
-*! Version 2.1.2  Modified:  April 2026
+*! Version 2.1.3  Modified:  April 2026
 
 // Drop all cto2 programs before (re)defining them
 cap program drop cto2
@@ -1294,7 +1294,7 @@ if "`datestyle'" == "YMD" {
 	replace format_command = ///
 		"tempvar date" + "`brek'" + ///
 		"clonevar \`date' = " + var_stub + "`brek'" + ///
-		`"replace "' + var_stub + `" = """' + "`brek'" + ///
+		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
 		`"replace "' + var_stub + ///
@@ -1307,7 +1307,7 @@ else {
 	replace format_command = ///
 		"tempvar date" + "`brek'" + ///
 		"clonevar \`date' = " + var_stub + "`brek'" + ///
-		`"replace "' + var_stub + `" = """' + "`brek'" + ///
+		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
 		`"replace "' + var_stub + ///
@@ -1321,7 +1321,7 @@ if "`datestyle'" == "YMD" {
 	replace format_command = ///
 		"tempvar date" + "`brek'" + ///
 		"clonevar \`date' = " + var_stub + "`brek'" + ///
-		`"replace "' + var_stub + `" = """' + "`brek'" + ///
+		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
 		`"replace "' + var_stub + ///
@@ -1333,7 +1333,7 @@ else {
 	replace format_command = ///
 		"tempvar date" + "`brek'" + ///
 		"clonevar \`date' = " + var_stub + "`brek'" + ///
-		`"replace "' + var_stub + `" = """' + "`brek'" + ///
+		`"cap replace "' + var_stub + `" = """' + "`brek'" + ///
 		"if _rc replace " + var_stub + " = ." + "`brek'" + ///
 		"destring " + var_stub + ", replace" + "`brek'" + ///
 		`"replace "' + var_stub + ///
